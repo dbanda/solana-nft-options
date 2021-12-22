@@ -18,6 +18,9 @@ const your_private_key = [58,61,83,12,252,164,114,167,16,61,196,241,213,70,111,7
     237,158,140,188,84,202,116,216,78,242,2,9,33,177,53,200,7,221,76,53,149,13,243,125,153,187,239,178,76,
     197,203,88,218,186,174,108,71,19,254,203]
 
+// connect to your cluster e.g localhost or devnet
+const connection = new Connection("https://api.devnet.solana.com", 'singleGossip');
+
 ```
 
 ```Javascript
@@ -29,7 +32,7 @@ let creator_acc = Keypair.fromSecretKey(new Uint8Array(your_private_key))
 // set strikes and expiry
 let strike = 100
 let expiry = Date.now()/1000 + 600 //expire in 10 mins
-let multiple = 1000000000``
+let multiple = 1000000000
 
 // the address or symbol you are selling on this call
 let instrument = "SOL"

@@ -7,10 +7,10 @@ import BN from "bn.js";
 import dayjs from "dayjs";
 import { OPTION_ACCOUNT_DATA_LAYOUT, OptionLayout } from "./layout";
 import {print_contract, get_contract_from_blockchain, verify_contract} from "./utils";
-export {get_contract_from_blockchain, verify_contract}
+export {get_contract_from_blockchain, verify_contract, print_contract}
 import { TokenListProvider, TokenInfo } from '@solana/spl-token-registry';
 
-const OPTIONS_PROGRAM_ID = "AjpVpw2SkQwTkBWWzrwuz4B5hY1b2ir5PZHykWT28iqB"
+const OPTIONS_PROGRAM_ID = "DV4NugS55eXXposgxLnLr7WxySCTpaDd3cQPegFenHaj"
 const SEED = "optionsnft";
 let TOKEN_LIST : TokenInfo[] = null
 const CLUSTER_SLUG = "mainnet-beta"
@@ -175,25 +175,6 @@ async function create_new_nft_mint(connection: Connection, multiple: number, cre
             .add(createInstrumentMintIx, createNewNFTMintIx);
     let sig = await connection.sendTransaction(tx, [creator_account, instrument_mint_acc], {skipPreflight: false, preflightCommitment: 'finalized'});
     return [sig, instrument_mint_acc, creator_instrument_acc]
-
-
-    // // create the instrument account that will hold the mint
-    // const creator_instrument_acc_keypair = new Keypair()
-    // const creator_instrument_acc = creator_instrument_acc_keypair.publicKey
-    // const account_rent = await connection.getMinimumBalanceForRentExemption(AccountLayout.span, 'confirmed')
-    // console.log("using %s lamports to create the instrument account", account_rent)
-    // const createInstrumentAccIx = SystemProgram.createAccount({
-    //   programId: TOKEN_PROGRAM_ID,
-    //   space: AccountLayout.span,
-    //   lamports: account_rent,
-    //   fromPubkey: creator_account.publicKey,
-    //   newAccountPubkey: creator_instrument_acc_keypair.publicKey
-    // });
-  
-    // // initialize the instrument account
-    // const initInstrumentAccIx = Token.createInitAccountInstruction(
-    //   TOKEN_PROGRAM_ID, instrument, creator_instrument_acc, creator_account.publicKey
-    // )
 }
 
 export async function create_option(connection: Connection, strike: number, expiry: number, multiple: number, creator_account: Keypair, 
