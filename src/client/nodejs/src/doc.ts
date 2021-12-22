@@ -16,7 +16,7 @@ const PUT_CONTRACT = "This contract gives holder of this token the right but not
 + " at a price of %d %s tokens per unit at or before %s"
 
 let TOKEN_LIST: TokenInfo[] = null;
-const ENDPOINT: string = "http://localhost:3000/contract"
+const ENDPOINT: string = "https://nftoptions.app/contract/"
 
 function write_doc_img(contract, image: Jimp){
 
