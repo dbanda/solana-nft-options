@@ -4,9 +4,9 @@ See https://nftoptions.app
 
 ### Table of Contents  
 [Installation](#installation)  
-[Examples](#examples) 
-[Publishing Contracts](#publish) 
-[Motivation](#motivation)  
+[Examples](#examples)  
+[Publishing Contracts](#publish)  
+[Motivation](#motivation)   
 [Benfits of Options on the Blockchain](#benfits-of-options-on-the-blockchain)   
 [Design](#design)  
 

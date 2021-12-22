@@ -2,6 +2,7 @@
 
     npm install sol-options
 
+See code and docs here: https://github.com/dbanda/solana-nft-options
 
 # Examples
 
@@ -87,4 +88,4 @@ You can create an image for your contract too and publish it to http://nftoption
 
 `example.png`
 
-![sample](../../../docs/contract.png)
+![sample](https://raw.githubusercontent.com/dbanda/solana-nft-options/master/docs/contract.png)
