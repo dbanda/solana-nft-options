@@ -12,7 +12,7 @@ See https://nftoptions.app
 
 ## Installation
 
-    npm install sol-options
+    npm install solana-options
 
 
 ## Examples
@@ -86,7 +86,7 @@ create_call(
 
 ## Publish
 
-You can create an image for your contract too and publish it to http://nftoptions.app
+You can create an image for your contract too and publish it to https://nftoptions.app
 
 ```Javascript
     create_call(
