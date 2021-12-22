@@ -7,7 +7,9 @@ import BN from "bn.js";
 import dayjs from "dayjs";
 import { OPTION_ACCOUNT_DATA_LAYOUT, OptionLayout } from "./layout";
 import {print_contract, get_contract_from_blockchain, verify_contract} from "./utils";
-export {get_contract_from_blockchain, verify_contract, print_contract}
+export {get_contract_from_blockchain, verify_contract, print_contract};
+import { publish_doc, create_doc_img } from "./doc";
+export {publish_doc, create_doc_img};
 import { TokenListProvider, TokenInfo } from '@solana/spl-token-registry';
 
 const OPTIONS_PROGRAM_ID = "DV4NugS55eXXposgxLnLr7WxySCTpaDd3cQPegFenHaj"

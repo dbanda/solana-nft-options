@@ -49,7 +49,8 @@ let creator_strike_instrument_acc = new sol.PublicKey('9H39mHQDLNN1crrQFwRu5w8Eu
 
 // create the call
 create_call(
-    connection,strike, expiry, multiple, creator_acc, instrument, strike_instrument, creator_instrument_acc, creator_strike_instrument_acc
+    connection,strike, expiry, multiple, creator_acc, instrument, strike_instrument, 
+    creator_instrument_acc, creator_strike_instrument_acc
 ).then(([sig, contract])=>{
     console.log(sol_options.print_contract(contract))
 })
@@ -78,12 +79,13 @@ You can create an image for your contract too and publish it to http://nftoption
 
 ```Javascript
     create_call(
-        connection,strike, expiry, multiple, creator_acc, instrument, strike_instrument, creator_instrument_acc, creator_strike_instrument_acc
+        connection,strike, expiry, multiple, creator_acc, instrument, strike_instrument, 
+        creator_instrument_acc, creator_strike_instrument_acc
     ).then(([sig, contract])=>{
         console.log(printed_contract(contract))
-        sol_options.create_doc_img(contract).then(err, img, cb)=>{
+        sol_options.create_doc_img(contract).then(async img=>{
             img.write("example.png");
-            await publish_doc(contract)
+            await sol_options.publish_doc(contract)
         })
     })
 ```
