@@ -5,7 +5,9 @@
     "allowJs": true,
     "target": "es2017",
     "esModuleInterop": true,
-    "moduleResolution": "node"
+    "moduleResolution": "node",
+    "declaration": true,
+    "declarationMap": true
   },
   "include": ["src/**/*.ts"]
 }
