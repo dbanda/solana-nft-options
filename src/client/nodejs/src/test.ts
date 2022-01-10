@@ -17,7 +17,7 @@ import { close_option, create_call, create_put, exercise_call, OptionType } from
 import { create_doc_img } from "./doc";
 import { print_contract } from "./utils";
 import Jimp from "jimp";
-import QRCode from "easyqrcodejs-nodejs";
+import QRCode from "qrcode";
 // import { create_call, excercise_call, OptionType } from pack;
 // pack.cre
 // let [create_call, excercise_call, OptionType] = [sol_options.create_call, sol_options.exercise_call,sol_options.OptionType]
@@ -316,8 +316,8 @@ describe("exercise contract", function(){
 
 
 describe("create contract doc", function(){
-    this.timeout(20_000);
-    it('create put contract doc', function() {
+    this.timeout(60_000);
+    it('create put contract doc', async function() {
 
         let strike =100
         let expiry = Date.now()/1000 + 600
@@ -326,16 +326,13 @@ describe("create contract doc", function(){
         let strike_instrument = new PublicKey('6Uhbk6FwCLLQfsKJ8kn8uCsiF5iZNVQDw5QxMNJh9XiJ')
         
         let font_spy = sinon.spy(Jimp, "loadFont")
-        let qrcode_spy = sinon.spy(QRCode.prototype, "toDataURL")
+        let qrcode_spy = sinon.spy(QRCode, "toDataURL")
 
-        return create_put(
-            connection,strike, expiry, multiple, creator_acc, instrument, strike_instrument, creator_instrument_acc, creator_strike_instrument_acc
-        ).then(([sig,contract])=>{
-            return create_doc_img(contract).then(img=>{
-                console.log("calling cb", !!img)
-                expect(font_spy.callCount).to.equal(3)
-                expect(qrcode_spy.callCount).to.equal(1)
-            })
-        }).catch()   
+        const [sig, contract] = await create_put(
+            connection, strike, expiry, multiple, creator_acc, instrument, strike_instrument, creator_instrument_acc, creator_strike_instrument_acc
+        );
+        const img = await create_doc_img(contract);
+        expect(font_spy.callCount).to.equal(1);
+        expect(qrcode_spy.callCount).to.equal(1);   
     });
 })

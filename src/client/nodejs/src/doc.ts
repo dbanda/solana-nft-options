@@ -1,7 +1,7 @@
 import Jimp from 'jimp';
 import util from 'util';
 import dayjs from 'dayjs';
-import QRCode from 'easyqrcodejs-nodejs';
+import QRCode from 'qrcode';
 import { TokenListProvider, TokenInfo } from '@solana/spl-token-registry';
 import { Contract } from '.';
 import axios from 'axios';
@@ -32,16 +32,15 @@ function write_doc_img(contract, image: Jimp){
         if (y&&y>line){ line = y}
         Jimp.read(url).then(logo_img =>{
           logo_img.resize(18,18,(e,l)=>{
-            console.log("blizing",e)
             image.blit(l, xx||x, yy||y, cb)
-            
           })
-        })
+        }).catch(err=> reject(err))
       }
       return load_logo_cb
     }
 
     function contract_txt(err, image:Jimp, coord){
+      console.log("writing contract txt")
       if (err) return reject(err);
       let pos = coord || {x:0,y:0}
       if (pos.y&&pos.y>line){ line = pos.y}
@@ -81,13 +80,12 @@ function write_doc_img(contract, image: Jimp){
     }
 
     function qqrcode(err, image:Jimp, coord){
+      console.log("writing qrcode")
       if (err) return reject(err);
       let pos = coord || {x:0,y:0}
       if (pos.y&&pos.y>line){ line = pos.y}
 
-      // New instance with options
-      let qrcode = new QRCode({text: "nftoption.app?nft=" + contract.nft_id + "?account=" + contract.account_id});
-      let data_url = qrcode.toDataURL()
+      let data_url = QRCode.toDataURL("nftoption.app?nft=" + contract.nft_id + "?account=" + contract.account_id)
       data_url.then(url=>{
         // console.log(url)
         const [, data] = url.split(',');
@@ -98,11 +96,12 @@ function write_doc_img(contract, image: Jimp){
           qrimg.resize(w,h,(e,qrimg)=>{
             image.blit(qrimg, 300-w/2, line-h, contract_txt)
           })
-        })
-      })
+        }).catch(err=> reject(err))
+      }).catch(err=> reject(err))
     }
 
     function nft_token_id(err, image:Jimp, coord){
+      console.log("writing nft token id")
       if (err) return reject(err);
       let pos = coord || {x:0,y:0}
       if (pos.y&&pos.y>line){ line = pos.y}
@@ -114,10 +113,10 @@ function write_doc_img(contract, image: Jimp){
             alignmentY: Jimp.VERTICAL_ALIGN_MIDDLE
           }
           ,WIDTH,qqrcode)
-
     }
 
     function account(err, image:Jimp, coord){
+      console.log("writing account")
       if (err) return reject(err);
       let pos = coord || {x:0,y:0}
       if (pos.y&&pos.y>line){ line = pos.y}
@@ -132,6 +131,7 @@ function write_doc_img(contract, image: Jimp){
     }
 
     function expiry(err, image:Jimp, coord){
+      console.log("writing expiry")
       if (err) return reject(err);
       let pos = coord || {x:0,y:0}
       if (pos.y&&pos.y>line){ line = pos.y}
@@ -146,6 +146,7 @@ function write_doc_img(contract, image: Jimp){
     }
 
     function multiple_fn(err, image:Jimp, coord){
+      console.log("writing multiple")
       if (err) return reject(err);
       let pos = coord || {x:0,y:0}
       if (pos.y&&pos.y>line){ line = pos.y}
@@ -160,37 +161,38 @@ function write_doc_img(contract, image: Jimp){
     }
 
     function strike_token(err, image:Jimp, coord){
+      console.log("writing strike token", err, coord)
+      if (err) return reject(err);
       let pos = coord || {x:0,y:0}
       if (pos.y&&pos.y>line){ line = pos.y}
       get_token(contract.strike_instrument, (tokl: TokenInfo)=>{
         if (tokl){
           let tok = tokl
           logo = tok.logoURI
-
           image.print(font,30, line+10,
             {
               text: 'STRIKE: '+ contract.strike + ' ' + tok.symbol ,
               alignmentX: Jimp.HORIZONTAL_ALIGN_LEFT,
               alignmentY: Jimp.VERTICAL_ALIGN_MIDDLE
             }
-            ,WIDTH,load_logo(logo, expiry,null,line+10))
+            ,WIDTH,load_logo(logo, multiple_fn, null,line+10))
         }else {
-          Jimp.loadFont(Jimp.FONT_SANS_16_BLACK).then(font=>{
-            image.print(font,30, line+10,
-              {
-                text: 'STRIKE: ' + contract.strike + ' ' + contract.strike_instrument ,
-                alignmentX: Jimp.HORIZONTAL_ALIGN_LEFT,
-                alignmentY: Jimp.VERTICAL_ALIGN_MIDDLE
-              }
-              ,WIDTH,multiple_fn)
-            })
+          image.print(font,30, line+10,
+            {
+              text: 'STRIKE: ' + contract.strike + ' ' + contract.strike_instrument ,
+              alignmentX: Jimp.HORIZONTAL_ALIGN_LEFT,
+              alignmentY: Jimp.VERTICAL_ALIGN_MIDDLE
+            }
+            ,WIDTH, multiple_fn)
         }
       })
     }
 
 
-    function instrument(err, image: Jimp, {x,y}){
+    function instrument(err, image: Jimp){
       console.log("writing instruments")
+      if (err) return reject(err);
+
       get_token(contract.instrument, (tokl: TokenInfo)=>{
         if (tokl){
           let tok = tokl
@@ -203,15 +205,13 @@ function write_doc_img(contract, image: Jimp){
             }
             ,WIDTH,load_logo(logo,strike_token,null, 60))
         }else{
-          Jimp.loadFont(Jimp.FONT_SANS_16_BLACK).then(font=>{
-            image.print(font, 30, 60,
-              {
-                text: 'INSTRUMENT: ' + contract.instrument,
-                alignmentX: Jimp.HORIZONTAL_ALIGN_LEFT,
-                alignmentY: Jimp.VERTICAL_ALIGN_MIDDLE
-              }
-              ,WIDTH-30,strike_token)
-          })
+          image.print(font, 30, 60,
+            {
+              text: 'INSTRUMENT: ' + contract.instrument,
+              alignmentX: Jimp.HORIZONTAL_ALIGN_LEFT,
+              alignmentY: Jimp.VERTICAL_ALIGN_MIDDLE
+            }
+            ,WIDTH-30, strike_token)
         }
       })
     }
@@ -232,35 +232,32 @@ function write_doc_img(contract, image: Jimp){
     }else{
       title('PUT OPTION CONTRACT')
     }
-
   })
 }
 
 export function create_doc_img(contract: Contract): Promise<Jimp>{
-  return new Promise<Jimp>((resolve)=>{
+  return new Promise<Jimp>((resolve, reject)=>{
     new Jimp(WIDTH, HEIGHT, "#eeeee4", async (err, image) => {  
-      write_doc_img(print_contract(contract), image).then(img =>{
-        resolve(img)
-      })
+      if(err) reject(err);
+      let img = await write_doc_img(print_contract(contract), image)
+      resolve(img)
     })  
   })
 }
 
 
-function get_token(mint, cb){
+function get_token(mint: string, cb){
   if (TOKEN_LIST){
     let res = TOKEN_LIST.filter(t => t.address==mint)
-    // console.log("fetched tokens", res)
     if (res.length > 0) return cb(res[0]);
-    cb(null)
+    return cb(null)
       
   }else{
     new TokenListProvider().resolve().then((tokens) => {
       const tokenList = tokens.filterByClusterSlug('mainnet-beta').getList();
-      // console.log(tokenList);
       TOKEN_LIST = tokenList;
       get_token(mint, cb)
-    });
+    }).catch(err=>{throw err});
   }
 
 
