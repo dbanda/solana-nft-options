@@ -1,18 +1,17 @@
 
 import { AccountLayout, MintLayout,  Token, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID } from "@solana/spl-token";
-// import { SystemProgram } from "@solana/web3.js";
-import { AccountInfo, Keypair } from "@solana/web3.js";
-import { Account, Connection, PublicKey, SystemProgram, SYSVAR_RENT_PUBKEY,  Transaction, TransactionInstruction } from "@solana/web3.js";
+import { Keypair, Signer } from "@solana/web3.js";
+import { Connection, PublicKey, SystemProgram, SYSVAR_RENT_PUBKEY,  Transaction, TransactionInstruction } from "@solana/web3.js";
 import BN from "bn.js";
 import dayjs from "dayjs";
-import { OPTION_ACCOUNT_DATA_LAYOUT, OptionLayout } from "./layout";
+import { OPTION_ACCOUNT_DATA_LAYOUT } from "./layout";
 import {print_contract, get_contract_from_blockchain, verify_contract} from "./utils";
 export {get_contract_from_blockchain, verify_contract, print_contract};
 import { publish_doc, create_doc_img } from "./doc";
 export {publish_doc, create_doc_img};
 import { TokenListProvider, TokenInfo } from '@solana/spl-token-registry';
 
-const OPTIONS_PROGRAM_ID = "DV4NugS55eXXposgxLnLr7WxySCTpaDd3cQPegFenHaj"
+const OPTIONS_PROGRAM_ID = process.env.OPTIONS_PROGRAM_ID || process.env.REACT_APP_OPTIONS_PROGRAM_ID || "DV4NugS55eXXposgxLnLr7WxySCTpaDd3cQPegFenHaj"
 const SEED = "optionsnft";
 let TOKEN_LIST : TokenInfo[] = null
 const CLUSTER_SLUG = "mainnet-beta"
@@ -71,7 +70,7 @@ async function get_token_map(): Promise<Map<string,string>>{
  * @param creator_strike_instrument_acc 
  * @returns 
  */
-export async function create_call(connection: Connection, strike: number, expiry: number, multiple: number, creator_account: Keypair, 
+export async function create_call(connection: Connection, strike: number, expiry: number, multiple: number, creator_account: Signer, 
     instrument: PublicKey | string, strike_instrument: PublicKey | string, creator_instrument_acc: PublicKey, 
     creator_strike_instrument_acc: PublicKey)  : Promise<[string, Contract]>{
       console.log("creating call contract")
@@ -103,7 +102,7 @@ export async function create_put(connection: Connection, strike: number, expiry:
       strike_instrument, creator_instrument_acc, creator_strike_instrument_acc, OptionType.put)
 }
 
-async function create_new_nft_mint(connection: Connection, multiple: number, creator_account: Keypair) {
+async function create_new_nft_mint(connection: Connection, multiple: number, creator_account: Signer) {
     const instrument_mint_acc = new Keypair();
     console.log("instrument mint account key: ", instrument_mint_acc.publicKey.toString())
     const mint_rent = await connection.getMinimumBalanceForRentExemption(MintLayout.span, 'confirmed')
@@ -122,7 +121,6 @@ async function create_new_nft_mint(connection: Connection, multiple: number, cre
     const [creator_instrument_acc, _] = await PublicKey.findProgramAddress(
       [
         creator_account.publicKey.toBytes(),
-        // ASSOCIATED_TOKEN_PROGRAM_ID.toBuffer(),
         TOKEN_PROGRAM_ID.toBytes(),
         instrument_mint_acc.publicKey.toBytes()
       ], ASSOCIATED_TOKEN_PROGRAM_ID);
@@ -179,7 +177,7 @@ async function create_new_nft_mint(connection: Connection, multiple: number, cre
     return [sig, instrument_mint_acc, creator_instrument_acc]
 }
 
-export async function create_option(connection: Connection, strike: number, expiry: number, multiple: number, creator_account: Keypair, 
+export async function create_option(connection: Connection, strike: number, expiry: number, multiple: number, creator_account: Signer, 
   instrument: PublicKey | string, strike_instrument: PublicKey | string, creator_instrument_acc: PublicKey, creator_strike_instrument_acc: PublicKey, kind: OptionType) : Promise<[string, Contract]>{
     
     // check if the either instrument or strike_instrument is a symbol or address(public); assume symbol if string
@@ -250,13 +248,11 @@ export async function create_option(connection: Connection, strike: number, expi
     const [nft_associated_account, _] = await PublicKey.findProgramAddress(
       [
         creator_account.publicKey.toBytes(),
-        // ASSOCIATED_TOKEN_PROGRAM_ID.toBuffer(),
         TOKEN_PROGRAM_ID.toBytes(),
         nftTokenAccount.publicKey.toBytes()
       ], ASSOCIATED_TOKEN_PROGRAM_ID);
 
     console.log("nft token: ", nftTokenAccount.publicKey.toString())
-    // console.log("nft token receive acc", nft_pda_acc.publicKey.toString())
     console.log("nft associated account: ", nft_associated_account.toString())
 
     const [pda, _bump_seed] = await PublicKey.findProgramAddress([Buffer.from(SEED)], optionsProgramId)
@@ -352,13 +348,13 @@ export async function create_option(connection: Connection, strike: number, expi
 
 }
 
-export async function exercise_call(connection: Connection, contract: Contract, buyer_acc: Keypair, buyer_nft_acc: PublicKey,
+export async function exercise_call(connection: Connection, contract: Contract, buyer_acc: Signer, buyer_nft_acc: PublicKey,
   buyer_receive_acc: PublicKey, buyer_send_acc: PublicKey){
     return exercise_option(connection, contract, buyer_acc, buyer_nft_acc,
       buyer_receive_acc, buyer_send_acc, OptionType.call)
 }
 
-export async function exercise_put(connection: Connection, contract: Contract, buyer_acc: Keypair, buyer_nft_acc: PublicKey,
+export async function exercise_put(connection: Connection, contract: Contract, buyer_acc: Signer, buyer_nft_acc: PublicKey,
   buyer_receive_acc: PublicKey, buyer_send_acc: PublicKey){
     return exercise_option(connection, contract, buyer_acc, buyer_nft_acc,
       buyer_receive_acc, buyer_send_acc, OptionType.put)
@@ -368,14 +364,14 @@ export async function exercise_put(connection: Connection, contract: Contract, b
  * Exercises the options contract
  * @param connection connection to the cluster
  * @param contract the Contract 
- * @param buyer_acc buyer's keypair
+ * @param buyer_acc buyer's account
  * @param buyer_nft_acc the buyer's account that holds the ownership nft. This get burned by the exercise instruction
  * @param buyer_receive_acc account the buyers expects to receive the options collateral 
  * @param buyer_send_acc the account holding the tokens the buyer is sending to exercise this contract
  * @param kind call or put
  * @returns signature
  */
-export async function exercise_option(connection: Connection, contract: Contract, buyer_acc: Keypair, buyer_nft_acc: PublicKey,
+export async function exercise_option(connection: Connection, contract: Contract, buyer_acc: Signer, buyer_nft_acc: PublicKey,
    buyer_receive_acc: PublicKey, buyer_send_acc: PublicKey, kind: OptionType) : Promise<string> {
   
     let strike = contract.strike;
@@ -445,6 +441,10 @@ export async function exercise_option(connection: Connection, contract: Contract
         pubkey: pda_account,
         isSigner: false,
         isWritable: true
+      }, {
+        pubkey: SystemProgram.programId,
+        isSigner: false,
+        isWritable: false
       }
     ],
       data: Buffer.from(Uint8Array.of(1, ...new BN(strike).toArray("le", 8), 

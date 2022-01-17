@@ -23,6 +23,8 @@ Let's show how you can create a call contract to sell 420 units of SOL token for
 var sol = require("@solana/web3.js");
 var sol_options = require("solana-options")
 
+// included for example purpose.
+// In practice this would come securely from a wallet such as Phantom e.t.c
 const your_private_key = [45,142,52,139,158,173,187,83,102,42,19,164,139,139,205,
  206,230,214,180,206,143,85,173,181,255,225,10,156,247,8,71,177,181,140,215,
  137,129,185,26,79,119,184,240,246,7,123,174,112,154,172,151,52,204,95,75,118,
@@ -36,12 +38,12 @@ const connection = new sol.Connection("https://api.devnet.solana.com", 'singleGo
 ```Javascript
 // create a call contract contract
 
-// your account
+// your account.  In practice this would come securely from a wallet like Phantom e.t.c
 let creator_acc = sol.Keypair.fromSecretKey(new Uint8Array(your_private_key))
 
 // set strikes and expiry
 let strike = 69
-let expiry = Date.now()/1000 + 600 //expire in 10 mins
+let expiry = Date.now()/1000 + 600 //expire in 10 mins (600s)
 let multiple = 420
 
 // the address or symbol you are selling on this call

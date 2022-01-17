@@ -23,6 +23,7 @@ use spl_associated_token_account::{
     create_associated_token_account
 };
 
+use solana_program::native_token::LAMPORTS_PER_SOL;
 
 // check that account is expired
 pub fn is_expired(expiry_date: i64)-> Result<bool, ProgramError>{
@@ -154,7 +155,7 @@ fn _create(
     let nft_token_acc = next_account_info(account_info_iter)?;
     let token_program = next_account_info(account_info_iter)?;
     let _sys_var_program = next_account_info(account_info_iter)?;
-    let _system_program = next_account_info(account_info_iter)?;
+    let system_program = next_account_info(account_info_iter)?;
     let _nft_associated_account = next_account_info(account_info_iter)?;
     let _associate_token_account_program = next_account_info(account_info_iter)?;
     let options_program_account = next_account_info(account_info_iter)?;
@@ -170,49 +171,86 @@ fn _create(
         return Err(ProgramError::AccountAlreadyInitialized);
     }
 
-    msg!("transer to collateral acc");
-    let transfer_to_collateral_ix: solana_program::instruction::Instruction;
-
-    match kind{
-        OptionType::Call =>{
-            transfer_to_collateral_ix = spl_token::instruction::transfer(
-                token_program.key,
-                instrument_acc.key,
-                collateral_acc.key,
-                creator_acc.key,
-                &[&creator_acc.key],
-                multiple,
-            )?;
-        }
-
-        OptionType::Put => {
-            transfer_to_collateral_ix = spl_token::instruction::transfer(
-                &spl_token::id(),
-                strike_instrument_acc.key,
-                collateral_acc.key,
-                creator_acc.key,
-                &[&creator_acc.key],
-                strike*multiple,
-            )?; 
-        }
-    }
-
-    msg!("Calling the token program to transfer to collateral acc");
-    let _res = invoke(
-        &transfer_to_collateral_ix,
-        &[
-            instrument_acc.clone(),
-            strike_instrument_acc.clone(),
-            collateral_acc.clone(),
-            creator_acc.clone(),
-            token_program.clone()
-            
-        ],
-    )?;
 
     msg!("program is owning collateral acc");
-
     take_collateral_ownership(token_program, collateral_acc, creator_acc, pda)?;
+
+    msg!("transer to collateral acc");
+    
+
+    let collateral_acc_data = spl_token::state::Account::unpack_from_slice(&collateral_acc.try_borrow_data()?)?;
+    
+    if collateral_acc_data.mint == spl_token::native_mint::id(){
+        msg!("transfer native to collateral acc {}", multiple*LAMPORTS_PER_SOL);
+        match kind{
+            OptionType::Call =>{
+                let native_transfer_ix = solana_program::system_instruction::transfer(creator_acc.key , collateral_acc.key, multiple*LAMPORTS_PER_SOL);
+                invoke(
+                    &native_transfer_ix,
+                    &[
+                        collateral_acc.clone(),
+                        creator_acc.clone(),
+                        system_program.clone()
+                    ],
+                )?;
+            }
+            OptionType::Put => {
+                let native_transfer_ix = solana_program::system_instruction::transfer(creator_acc.key , collateral_acc.key, strike*multiple*LAMPORTS_PER_SOL);
+                invoke(
+                    &native_transfer_ix,
+                    &[
+                        collateral_acc.clone(),
+                        creator_acc.clone(),
+                        system_program.clone()
+                    ],
+                )?;
+            }
+        }
+    } else {
+        // for the native mint just initialze, otherwise
+        let transfer_to_collateral_ix: solana_program::instruction::Instruction;
+        match kind{
+            OptionType::Call =>{
+                transfer_to_collateral_ix = spl_token::instruction::transfer(
+                    token_program.key,
+                    instrument_acc.key,
+                    collateral_acc.key,
+                    creator_acc.key,
+                    &[&creator_acc.key],
+                    multiple,
+                )?;
+            }
+    
+            OptionType::Put => {
+                transfer_to_collateral_ix = spl_token::instruction::transfer(
+                    &spl_token::id(),
+                    strike_instrument_acc.key,
+                    collateral_acc.key,
+                    creator_acc.key,
+                    &[&creator_acc.key],
+                    strike*multiple,
+                )?; 
+            }
+        }
+    
+        msg!("Calling the token program to transfer to collateral acc");
+        let _res = invoke(
+            &transfer_to_collateral_ix,
+            &[
+                instrument_acc.clone(),
+                strike_instrument_acc.clone(),
+                collateral_acc.clone(),
+                creator_acc.clone(),
+                token_program.clone()
+                
+            ],
+        )?;
+    } 
+
+
+
+
+    
 
     // let transferCollateralIx = transfer(from_pubkey: &Pubkey, to_pubkey: &Pubkey, lamports: u64)
     msg!("creating nft token");
@@ -371,10 +409,11 @@ pub fn exercise(accounts: &[AccountInfo], program_id: &Pubkey, strike: u64, mult
     let buyer_recv_token_acc = next_account_info(account_info_iter)?;
     let collateral_acc = next_account_info(account_info_iter)?;
     let writer_recv_acc = next_account_info(account_info_iter)?;
-    let _creator_acc = next_account_info(account_info_iter)?;
+    let creator_acc = next_account_info(account_info_iter)?;
     let token_program = next_account_info(account_info_iter)?;
     let options_program_account = next_account_info(account_info_iter)?;
     let pda_account = next_account_info(account_info_iter)?;
+    let system_program = next_account_info(account_info_iter)?;
 
     msg!("reading account data from {}", options_program_account.key);
     let options_info = SolOption::try_from_slice(&options_program_account.try_borrow_data()?)?;
@@ -423,77 +462,149 @@ pub fn exercise(accounts: &[AccountInfo], program_id: &Pubkey, strike: u64, mult
     assert_eq!(*collateral_acc.key, options_info.collateral_acc_pubkey);
     assert_eq!(*writer_recv_acc.key, options_info.recv_acc_pubkey);
 
+    // check creator account
+    assert_eq!(*creator_acc.key, options_info.creator_pubkey);
+
     // transfer tokens to seller
     msg!("transferring tokens to seller {} => {}", buyer_send_token_acc.key, options_info.recv_acc_pubkey);
-    let send_tok_ix = match kind{
-        OptionType::Call =>{
-            spl_token::instruction::transfer(
-                token_program.key, 
-                buyer_send_token_acc.key, 
-                &options_info.recv_acc_pubkey, 
-                buyer_acc.key, 
-                &[], 
-                multiple * strike
-            )
-        },
 
-        OptionType::Put => {
-            spl_token::instruction::transfer(
-                token_program.key, 
-                buyer_send_token_acc.key, 
-                &options_info.recv_acc_pubkey, 
-                buyer_acc.key, 
-                &[], 
-                multiple
-            )
-        }
-    }?;
+    let writer_recv_acc_data = spl_token::state::Account::unpack_from_slice(&writer_recv_acc.try_borrow_data()?)?;
+    
+    if writer_recv_acc_data.mint == spl_token::native_mint::id(){
+        // writer is receiving native so send native from buyer
+        let send_tok_ix = match kind{
+            OptionType::Call =>{
+                solana_program::system_instruction::transfer(buyer_acc.key, &options_info.creator_pubkey, multiple*strike*LAMPORTS_PER_SOL)
+            },
+            OptionType::Put =>{
+                solana_program::system_instruction::transfer(buyer_acc.key, &options_info.creator_pubkey, multiple*LAMPORTS_PER_SOL)
+            }
+        };
+        invoke(
+            &send_tok_ix, 
+            &[
+                buyer_acc.clone(),
+                creator_acc.clone(),
+                system_program.clone()
+            ]
+        )?;
+    }else{
+        // non native tokens
+        let send_tok_ix = match kind{
+            OptionType::Call =>{
+                spl_token::instruction::transfer(
+                    token_program.key, 
+                    buyer_send_token_acc.key, 
+                    &options_info.recv_acc_pubkey, 
+                    buyer_acc.key, 
+                    &[], 
+                    multiple * strike
+                )
+            },
+    
+            OptionType::Put => {
+                spl_token::instruction::transfer(
+                    token_program.key, 
+                    buyer_send_token_acc.key, 
+                    &options_info.recv_acc_pubkey, 
+                    buyer_acc.key, 
+                    &[], 
+                    multiple
+                )
+            }
+        }?;
+    
+        invoke(
+            &send_tok_ix, 
+            &[
+                buyer_acc.clone(),
+                writer_recv_acc.clone(),
+                buyer_send_token_acc.clone()
+            ]
+        )?;
+    }
 
-    invoke(
-        &send_tok_ix, 
-        &[
-            buyer_acc.clone(),
-            writer_recv_acc.clone(),
-            buyer_send_token_acc.clone()
-        ]
-    )?;
 
     let (pda, bump_seed) = Pubkey::find_program_address(&[b"optionsnft"], program_id);
     assert_eq!(pda, *pda_account.key);
-    msg!("transferring tokens to buy {} => {} pda {}",options_info.collateral_acc_pubkey, buyer_recv_token_acc.key, pda);
+    msg!("transferring tokens to buyer {} => {} pda {}",options_info.collateral_acc_pubkey, buyer_recv_token_acc.key, pda);
+    let collateral_acc_data = spl_token::state::Account::unpack_from_slice(&collateral_acc.try_borrow_data()?)?;
+    
+    if collateral_acc_data.mint == spl_token::native_mint::id(){
+        // close then transfer lamports
+        
+        msg!("Closing the collateral account");
+        let close_pdas_collateral_acc_ix = spl_token::instruction::close_account(
+            token_program.key,
+            collateral_acc.key,
+            &pda,
+            &pda,
+            &[&pda]
+        )?;
+        msg!("Calling the token program to close pda's temp account...");
+        invoke_signed(
+            &close_pdas_collateral_acc_ix,
+            &[
+                collateral_acc.clone(),
+                pda_account.clone(),
+                token_program.clone(),
+            ],
+            &[&[&b"optionsnft"[..], &[bump_seed]]],
+        )?;
+        msg!("transerfing sol from pda to buyer");
+        let recv_tok_ix = match kind{
+            OptionType::Call =>{
+                solana_program::system_instruction::transfer(&pda, buyer_acc.key, multiple*LAMPORTS_PER_SOL)
+            },
+            OptionType::Put =>{
+                solana_program::system_instruction::transfer(&pda, buyer_acc.key, strike*multiple*LAMPORTS_PER_SOL)
+            }
+        };
+        invoke_signed(
+            &recv_tok_ix, 
+            &[
+                collateral_acc.clone(),
+                buyer_acc.clone(),
+                pda_account.clone(),
+                system_program.clone()
+            ],
+            &[&[&b"optionsnft"[..], &[bump_seed]]],
+        )?;
+    }else{
+        let recv_tok_ix = match kind{
+            OptionType::Call =>{
+                spl_token::instruction::transfer(
+                    token_program.key, 
+                    &options_info.collateral_acc_pubkey, 
+                    buyer_recv_token_acc.key, 
+                    &pda, 
+                    &[&pda], 
+                    multiple
+                )
+            }
+            OptionType::Put =>{
+                spl_token::instruction::transfer(
+                    token_program.key, 
+                    &options_info.collateral_acc_pubkey, 
+                    buyer_recv_token_acc.key, 
+                    &pda, 
+                    &[&pda], 
+                    multiple*strike
+                )
+            }
+        }?;
+        invoke_signed(
+            &recv_tok_ix, 
+            &[
+                collateral_acc.clone(),
+                buyer_recv_token_acc.clone(),
+                pda_account.clone(),
+                token_program.clone()
+            ],
+            &[&[&b"optionsnft"[..], &[bump_seed]]],
+        )?;
+    }
 
-    let recv_tok_ix = match kind{
-        OptionType::Call =>{
-            spl_token::instruction::transfer(
-                token_program.key, 
-                &options_info.collateral_acc_pubkey, 
-                buyer_recv_token_acc.key, 
-                &pda, 
-                &[&pda], 
-                multiple
-            )
-        }
-        OptionType::Put =>{
-            spl_token::instruction::transfer(
-                token_program.key, 
-                &options_info.collateral_acc_pubkey, 
-                buyer_recv_token_acc.key, 
-                &pda, 
-                &[&pda], 
-                multiple*strike
-            )
-        }
-    }?;
-    invoke_signed(
-        &recv_tok_ix, 
-        &[
-            collateral_acc.clone(),
-            buyer_recv_token_acc.clone(),
-            pda_account.clone(),
-            token_program.clone()
-        ],
-        &[&[&b"optionsnft"[..], &[bump_seed]]],
-    )?;
 
     msg!("closing collateral accounts");
     close_accounts(accounts, pda, bump_seed)?;
@@ -600,43 +711,50 @@ pub fn close(accounts: &[AccountInfo], program_id: &Pubkey)-> ProgramResult{
 
     // check that contract is expired
     if !is_expired(options_info.expiry_date).unwrap(){
+        msg!("error: contract is not yet expired. cannot close {}", options_info.expiry_date);
         return Err(ProgramError::from(error::OptionsError::ContractNotExpired))
     }
     let (pda, bump_seed) = Pubkey::find_program_address(&[b"optionsnft"], program_id);
-    msg!("returning collateral to creator and closing option");
-    let ret_tok_ix = match options_info.kind{
-        0 =>{
-            spl_token::instruction::transfer(
-                token_program.key, 
-                &options_info.collateral_acc_pubkey, 
-                creator_recv_acc.key, 
-                &pda, 
-                &[&pda], 
-                options_info.multiple
-            )
-        }
-        1 =>{
-            spl_token::instruction::transfer(
-                token_program.key, 
-                &options_info.collateral_acc_pubkey, 
-                creator_recv_acc.key, 
-                &pda, 
-                &[&pda], 
-                options_info.multiple*options_info.strike
-            )
-        }
-        _ => { Err(ProgramError::from(error::OptionsError::WrongContractType)) }
-    }?;
-    invoke_signed(
-        &ret_tok_ix, 
-        &[
-            collateral_acc.clone(),
-            creator_recv_acc.clone(),
-            pda_account.clone(),
-            token_program.clone()
-        ],
-        &[&[&b"optionsnft"[..], &[bump_seed]]],
-    )?;
+    let collateral_acc_data = spl_token::state::Account::unpack_from_slice(&collateral_acc.try_borrow_data()?)?;
+    
+    // native account do the transfer on close
+    if collateral_acc_data.mint != spl_token::native_mint::id(){    
+        msg!("returning collateral to creator and closing option");
+        let ret_tok_ix = match options_info.kind{
+            0 =>{
+                spl_token::instruction::transfer(
+                    token_program.key, 
+                    &options_info.collateral_acc_pubkey, 
+                    creator_recv_acc.key, 
+                    &pda, 
+                    &[&pda], 
+                    options_info.multiple
+                )
+            }
+            1 =>{
+                spl_token::instruction::transfer(
+                    token_program.key, 
+                    &options_info.collateral_acc_pubkey, 
+                    creator_recv_acc.key, 
+                    &pda, 
+                    &[&pda], 
+                    options_info.multiple*options_info.strike
+                )
+            }
+            _ => { Err(ProgramError::from(error::OptionsError::WrongContractType)) }
+        }?;
+        invoke_signed(
+            &ret_tok_ix, 
+            &[
+                collateral_acc.clone(),
+                creator_recv_acc.clone(),
+                pda_account.clone(),
+                token_program.clone()
+            ],
+            &[&[&b"optionsnft"[..], &[bump_seed]]],
+        )?;
+    }
+
 
     // check collateral acc is correct
     assert_eq!(*collateral_acc.key, options_info.collateral_acc_pubkey);

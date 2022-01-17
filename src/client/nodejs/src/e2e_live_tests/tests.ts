@@ -5,7 +5,7 @@ import { AccountInfo, Keypair } from "@solana/web3.js";
 import { Account, Connection, PublicKey, SystemProgram, SYSVAR_RENT_PUBKEY,  Transaction, TransactionInstruction } from "@solana/web3.js";
 import BN from "bn.js";
 import Jimp from "jimp/*";
-import { create_call, create_put, exercise_call, exercise_put, get_contract_from_blockchain } from "..";
+import { close_option, create_call, create_put, exercise_call, exercise_put, get_contract_from_blockchain } from "..";
 import { create_doc_img, publish_doc } from "../doc";
 import { OPTION_ACCOUNT_DATA_LAYOUT, OptionLayout } from "../layout";
 import { print_contract, verify_contract } from "../utils";
@@ -179,7 +179,6 @@ describe("create option then exercise",  function(){
     verify_contract(contract, option_layout) // verify the contract matches what is on the blockchain
     
     // try to exercise the contract
-    // for this test, the buyer is the same as creator
     let buyer_acc = bob_acc
 
     let buyer_send_acc = bob_a_key
@@ -203,7 +202,7 @@ describe("create option then exercise",  function(){
     await connection.confirmTransaction(sig_sell, "finalized");
 
   
-    // confirm the nft ownership token wasn't received
+    // confirm the nft ownership token
     let nft_bal_before = await connection.getTokenAccountBalance(buyer_nft_acc, "finalized")
     assert.equal(nft_bal_before.value.amount, "1")
 
@@ -222,8 +221,8 @@ describe("create option then exercise",  function(){
     let send_bal_after = await connection.getTokenAccountBalance(buyer_send_acc, "finalized")
     let recv_bal_after = await connection.getTokenAccountBalance(buyer_receive_acc, "finalized")
 
-    assert.equal(send_bal_after.value.uiAmount, send_bal_before.value.uiAmount-(strike*multiple))
-    assert.equal(recv_bal_after.value.uiAmount, recv_bal_before.value.uiAmount+multiple)
+    assert.equal(send_bal_after.value.uiAmount, send_bal_before.value.uiAmount-multiple)
+    assert.equal(recv_bal_after.value.uiAmount, recv_bal_before.value.uiAmount+(strike*multiple))
 
   })
 
@@ -282,6 +281,54 @@ describe("create option then exercise",  function(){
     assert.equal(send_bal_after.value.uiAmount, send_bal_before.value.uiAmount)
     assert.equal(recv_bal_after.value.uiAmount, recv_bal_before.value.uiAmount)
 
+  })
+})
+
+describe("create option then close",  function(){
+  this.timeout(600_000); // tests can take up to 10 mins
+  it("alice creates call then closes", async function(){
+    
+    let strike = 2
+    let expiry = Date.now()/1000
+    let multiple = 5
+
+    let [s, contract] = await create_call(
+      connection,strike, expiry, multiple, alice_acc, toka_key, tokb_key, alice_a_key, alice_b_key
+    )
+    
+    console.log(contract, print_contract(contract))
+  
+    await connection.confirmTransaction(s, "finalized") // wait a while to confirm the transactions
+    let option_layout = await get_contract_from_blockchain(connection, contract.account_id)
+    console.log(option_layout)
+    verify_contract(contract, option_layout) // verify the contract matches what is on the blockchain
+    console.log("waiting 180s for contract to expire. Test will fail if validators are not current")
+    await new Promise(resolve => setTimeout(resolve, 180_000)); // wait for contract to expire
+    console.log("close call")
+    let sig = await close_option(connection, contract, alice_acc, alice_a_key)
+    await connection.confirmTransaction(sig, "finalized")
+  })
+
+
+  it("alice creates call then tries to close before expiry", async function(){
+    
+    let strike = 2
+    let expiry = Date.now()/1000+600
+    let multiple = 5
+
+    let [s, contract] = await create_call(
+      connection,strike, expiry, multiple, alice_acc, toka_key, tokb_key, alice_a_key, alice_b_key
+    )
+    
+    console.log(contract, print_contract(contract))
+  
+    await connection.confirmTransaction(s, "finalized") // wait a while to confirm the transactions
+    let option_layout = await get_contract_from_blockchain(connection, contract.account_id)
+    console.log(option_layout)
+    verify_contract(contract, option_layout) // verify the contract matches what is on the blockchain
+
+    console.log("close call")
+    await assert.rejects(close_option(connection, contract, alice_acc, alice_a_key))
   })
 })
 

@@ -1,6 +1,6 @@
 {
   "name": "solana-options",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Minting of options contract NFTs on the Solana blockchain",
   "main": "build/index.js",
   "scripts": {

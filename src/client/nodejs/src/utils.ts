@@ -47,7 +47,7 @@ export async function verify_contract(contract: Contract, option_layout: OptionL
   let expiry = Number(option_layout.expiry_date.readBigInt64LE())
   if (today > dayjs(expiry*1000)){
     console.error("This contract details are correct but it expired on %s , today is %s", 
-      dayjs(expiry).format(), today.format())
+      dayjs(expiry*1000).format(), today.format())
     throw "contract has exipired"
   }
   return true
