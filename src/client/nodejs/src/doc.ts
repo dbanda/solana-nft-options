@@ -85,7 +85,7 @@ function write_doc_img(contract, image: Jimp){
       let pos = coord || {x:0,y:0}
       if (pos.y&&pos.y>line){ line = pos.y}
 
-      let data_url = QRCode.toDataURL("https://nftoption.app?nft=" + contract.nft_id)
+      let data_url = QRCode.toDataURL("https://nftoptions.app?nft=" + contract.nft_id)
       data_url.then(url=>{
         // console.log(url)
         const [, data] = url.split(',');
