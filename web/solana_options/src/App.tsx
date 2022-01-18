@@ -72,7 +72,7 @@ function App() {
                   <MenuItem value={"Localnet"}>Localnet</MenuItem>
                   <MenuItem value={"Devnet"}>Devnet</MenuItem>
                   <MenuItem value={"Testnet"}>Testnet</MenuItem>
-                  <MenuItem value={"Mainet-beta"}>Mainnet</MenuItem>
+                  <MenuItem value={"Mainnet-beta"}>Mainnet</MenuItem>
                 </Select>
               </FormControl>
             </div>

@@ -12,7 +12,7 @@ import { ASSOCIATED_TOKEN_PROGRAM_ID, Token, TOKEN_PROGRAM_ID } from "@solana/sp
 import { TokenListProvider, TokenInfo } from '@solana/spl-token-registry';
 import { PublicKey, Connection, Transaction, SendOptions, Signer } from '@solana/web3.js';
 import { Alert, Grid } from '@mui/material';
-import { NETWORK_TO_URI } from './utils';
+import { NETWORK_DEFAULTS, NETWORK_TO_URI } from './utils';
 
 declare const window: any;
 
@@ -166,7 +166,7 @@ export default class CreateOption extends React.Component<createProps>{
             new PublicKey(instrument)
             new PublicKey(strike_instrument)
         } catch {
-            console.error("could not find keys for mints", instrument, strike_instrument)
+            console.error("could not find keys for mints", instrument, strike_instrument, this.state.network)
             this.setState({ show_alert: util.format("Could not find keys for one of mints %s, %s", instrument, strike_instrument), progress: false })
             throw util.format("Could not find keys for one of mints %s, %s", instrument, strike_instrument)
         }
@@ -312,7 +312,8 @@ export default class CreateOption extends React.Component<createProps>{
         this.network = this.props.network
         console.log("update ", this.network)
         if (this.props.network !== prevProps.network) {
-            console.log("update state", this.props.network)
+            this.TOKEN_LIST = undefined
+            console.log("create option update state", this.props.network)
             this.setState({ network: this.props.network })
         }
     }
@@ -334,7 +335,7 @@ export default class CreateOption extends React.Component<createProps>{
                 <Button variant="contained" onClick={() => { this.setState({ open: true }) }} sx={{ m: 2 }}>Create Contract</Button>
                 <Modal
                     open={this.state.open}
-                    onClose={() => { this.setState({ open: false, progress: false, show_alert: null }) }}
+                    onClose={() => { this.setState({ open: false, progress: false, show_alert: null, show_msg: null }) }}
                     aria-labelledby="modal-modal-title"
                     aria-describedby="modal-modal-description"
                 >
@@ -365,19 +366,22 @@ export default class CreateOption extends React.Component<createProps>{
                                     instrument:
                                 </Grid>
                                 <Grid item xs={7}>
-                                    <input name="instrument" required placeholder="instrument symbol or address" defaultValue="wSOL"></input>
+                                    <input name="instrument" required placeholder="instrument symbol or address"
+                                         defaultValue={NETWORK_DEFAULTS[(this.state.network as String).toLowerCase()].inst}></input>
                                 </Grid>
                                 <Grid item xs={5}>
                                     strike instrument:
                                 </Grid>
                                 <Grid item xs={7}>
-                                    <input name="strike_instrument" required placeholder="strike symbol or address" defaultValue="USDC" ></input>
+                                    <input name="strike_instrument" required placeholder="strike symbol or address" 
+                                        defaultValue={NETWORK_DEFAULTS[(this.state.network as String).toLowerCase()].strike_inst} ></input>
                                 </Grid>
                                 <Grid item xs={5}>
                                     strike:
                                 </Grid>
                                 <Grid item xs={7}>
-                                    <input name="strike" type="number" min="1" required placeholder="1" defaultValue="140"></input>
+                                    <input name="strike" type="number" min="1" required placeholder="1" 
+                                        defaultValue={NETWORK_DEFAULTS[(this.state.network as String).toLowerCase()].strike}></input>
                                 </Grid>
                                 <Grid item xs={5}>
                                     multiple:

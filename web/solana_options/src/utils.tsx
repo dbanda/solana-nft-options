@@ -3,10 +3,17 @@ import { Connection, PublicKey, SendOptions, Signer, Transaction } from "@solana
 declare const window: any;
 
 export const NETWORK_TO_URI: Record<string, string> = {
-    'mainet-beta': "https://api.mainnet-beta.solana.com",
+    'mainnet-beta': "https://api.mainnet-beta.solana.com",
     'devnet': "https://api.devnet.solana.com",
     'testnet': "https://api.testnet.solana.com/",
     'localnet': "http://localhost:8899"
+}
+
+export const NETWORK_DEFAULTS: Record<string, any> = {
+    'mainnet-beta': {inst: "wSOL", strike_inst: "USDC", strike: 140},
+    'testnet': {inst: "wSOL", strike_inst: "USDC", strike: 140},
+    'devnet': {inst: "SOL", strike_inst: "USDT_ILT", strike: 140},
+    'localnet': {inst: "SOL", strike_inst: "USDT_ILT", strike: 140},
 }
 
 export async function isTokenAccountAvailable(conn: Connection, addr: string, owner: Signer) {

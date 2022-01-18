@@ -72,6 +72,8 @@ export default class ContractTable extends React.Component<tableProps>{
   constructor(props: any) {
     super(props);
     this.network = props.network;
+    let show_closed = window.sessionStorage.getItem("show_closed");
+
     this.state = {
       page: 0,
       rowsPerPage: 10,
@@ -82,7 +84,7 @@ export default class ContractTable extends React.Component<tableProps>{
       row_busy: false,
       row_show_alert: null,
       row_show_msg: null,
-      show_closed: false,
+      show_closed: (show_closed == null)? true: (show_closed==="true"),
       loading_rows: true,
       receiver: ""
     }
@@ -117,6 +119,7 @@ export default class ContractTable extends React.Component<tableProps>{
     this.network = this.props.network
     console.log("contract table update ", this.network)
     if (this.props.network !== prevProps.network) {
+      this.TOKEN_MAP = undefined
       console.log("update state", this.props.network)
       this.setState({ network: this.props.network, rows: [this.getExample()[0]] })
       this.getData()
@@ -270,8 +273,11 @@ export default class ContractTable extends React.Component<tableProps>{
               return row
             })
 
-            // this.setState({ rows: new_rows, loading_rows: false })
-            this.setState({ rows: new_rows })
+            if (this.state.show_closed){
+              this.setState({ rows: new_rows, loading_rows: false })
+            }else{
+              this.setState({ rows: new_rows })
+            }
           })
         })
 
@@ -509,10 +515,11 @@ export default class ContractTable extends React.Component<tableProps>{
           <FormControlLabel control={<Switch
             checked={this.state.show_closed}
             onChange={(e, checked) => {
-              console.log("changing checked", checked)
-              this.setState({ show_closed: checked, rows: [] })
-              this.getData()
-            }
+                console.log("changing checked", checked)
+                window.sessionStorage.setItem("show_closed", checked);
+                this.setState({ show_closed: checked, rows: [] })
+                this.getData()
+              }
             }
           />} label="Show closed" />
         </FormGroup>
