@@ -17,13 +17,15 @@ See https://nftoptions.app
 
 ## Examples
 
+The webapp https://nftoptions.app (source [code](./web)) is a great working example of how you can use this package with the phantom wallet.
+
 Let's show how you can create a call contract to sell 420 units of SOL token for 69 USDC token each expiring 10 minutes from now
 
 ```Javascript
 var sol = require("@solana/web3.js");
 var sol_options = require("solana-options")
 
-// included for example purpose.
+// included for example purposes.
 // In practice this would come securely from a wallet such as Phantom e.t.c
 const your_private_key = [45,142,52,139,158,173,187,83,102,42,19,164,139,139,205,
  206,230,214,180,206,143,85,173,181,255,225,10,156,247,8,71,177,181,140,215,
