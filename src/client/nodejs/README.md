@@ -5,6 +5,7 @@
 See code and docs here: https://github.com/dbanda/solana-nft-options
 
 # Examples
+The webapp https://nftoptions.app (source [code](./web)) is a great working example of how you can use this package with the phantom wallet.
 
 Let's show how you can create a call contract to sell 420 units of SOL token for 69 USDC expiring 10 minutes from now
 
@@ -12,6 +13,8 @@ Let's show how you can create a call contract to sell 420 units of SOL token for
 var sol = require("@solana/web3.js");
 var sol_options = require("solana-options")
 
+// included for example purposes only.
+// In practice this would come securely from a wallet such as Phantom e.t.c
 const your_private_key = [45,142,52,139,158,173,187,83,102,42,19,164,139,139,205,
  206,230,214,180,206,143,85,173,181,255,225,10,156,247,8,71,177,181,140,215,
  137,129,185,26,79,119,184,240,246,7,123,174,112,154,172,151,52,204,95,75,118,
