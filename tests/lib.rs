@@ -16,6 +16,8 @@ use solana_sdk::{
     instruction::{AccountMeta, Instruction},
     signature::{Keypair, Signer},
     transaction::Transaction,
+    account::Account,
+    system_instruction
 };
 mod token_actions;
 use spl_token;
@@ -23,6 +25,7 @@ use spl_associated_token_account::{
     get_associated_token_address,
     create_associated_token_account
 };
+use solana_program::native_token::LAMPORTS_PER_SOL;
 
 
 pub struct TestOptions {
@@ -114,6 +117,22 @@ async fn test_create_call() {
 }
 
 #[tokio::test]
+async fn test_create_call_native() {
+    let strike : u64 = 69;
+    let multiple : u64 = 420;
+    let expiry : i64 = 123; 
+    let kind : u8 = 0; //call
+
+    let (mut banks_client, recent_blockhash, mut test_options) = start_test().await;
+    test_options.alice_a = Keypair::new();
+    test_options.alice_a_key = test_options.alice_a.pubkey();
+    test_options.tok_a_key = spl_token::native_mint::id();
+    token_actions::create_account(&mut banks_client, &test_options.alice_acc, recent_blockhash, &test_options.alice_a, 
+        &spl_token::native_mint::id(), &test_options.alice_acc.pubkey()).await.unwrap();
+    create_option(strike, multiple, expiry, kind, &mut test_options, &mut banks_client, recent_blockhash).await;
+}
+
+#[tokio::test]
 async fn test_create_put() {
     let strike : u64 = 69;
     let multiple : u64 = 420;
@@ -121,6 +140,22 @@ async fn test_create_put() {
     let kind : u8 = 1; //call
 
     let (mut banks_client, recent_blockhash, mut test_options) = start_test().await;
+    create_option(strike, multiple, expiry, kind, &mut test_options, &mut banks_client, recent_blockhash).await;
+}
+
+#[tokio::test]
+async fn test_create_put_native() {
+    let strike : u64 = 69;
+    let multiple : u64 = 420;
+    let expiry : i64 = 1223;
+    let kind : u8 = 1; //call
+
+    let (mut banks_client, recent_blockhash, mut test_options) = start_test().await;
+    test_options.alice_b = Keypair::new();
+    test_options.alice_b_key = test_options.alice_a.pubkey();
+    test_options.tok_b_key = spl_token::native_mint::id();
+    token_actions::create_account(&mut banks_client, &test_options.alice_acc, recent_blockhash, &test_options.alice_b, 
+        &spl_token::native_mint::id(), &test_options.alice_acc.pubkey()).await.unwrap();
     create_option(strike, multiple, expiry, kind, &mut test_options, &mut banks_client, recent_blockhash).await;
 }
 
@@ -161,6 +196,52 @@ async fn test_create_then_exercise_call() {
     check_closed(&test_options, &mut banks_client).await;
 }
 
+#[tokio::test]
+async fn test_create_then_exercise_call_native() {
+    let current_time: i64 = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs().try_into().unwrap();
+
+    let strike : u64 = 69;
+    let multiple : u64 = 420;
+    let expiry : i64 = current_time + 600; // expire 10 mins from now
+    let kind : u8 = 0; //call
+
+    let (mut banks_client, recent_blockhash, mut test_options) = start_test().await;
+    test_options.alice_a = Keypair::new();
+    test_options.alice_a_key = test_options.alice_a.pubkey();
+    test_options.tok_a_key = spl_token::native_mint::id();
+    token_actions::create_account(&mut banks_client, &test_options.alice_acc, recent_blockhash, &test_options.alice_a, 
+        &spl_token::native_mint::id(), &test_options.alice_acc.pubkey()).await.unwrap();
+    let (alice_a_before, alice_b_before, bob_a_before, bob_b_before, _) = get_balances(&mut banks_client, &test_options).await;
+    create_option(strike, multiple, expiry, kind, &mut test_options, &mut banks_client, recent_blockhash).await;
+
+    // check collateral transfered
+    let (alice_a_after, alice_b_after, _, _, alice_nft_after) = get_balances(&mut banks_client, &test_options).await;
+    let collateral_acc = banks_client.get_account(test_options.collateral_acc.pubkey()).await.unwrap().unwrap();
+    let rent = banks_client.get_rent().await.unwrap();
+    let account_rent = rent.minimum_balance(spl_token::state::Account::LEN);
+    assert_eq!(collateral_acc.lamports, multiple*LAMPORTS_PER_SOL+account_rent);
+    // assert_eq!(alice_a_before-multiple, alice_a_after);
+    assert_eq!(alice_b_before, alice_b_after);
+    assert_eq!(alice_nft_after, 1);
+   
+    // alice transfers token to bob
+    alice_sends_nft_to_bob(&mut banks_client, &test_options, recent_blockhash).await;
+    let (_, _, _, _, alice_nft_after) = get_balances(&mut banks_client, &test_options).await;
+    assert_eq!(alice_nft_after,0);
+
+    // bob sends an exercise instruction
+    let bob_acc_before = banks_client.get_balance(test_options.bob_acc.pubkey()).await.unwrap();
+    exercise_option(strike, multiple, kind, &test_options, &mut banks_client, recent_blockhash).await;
+
+    // // check final balances
+    let (alice_a_final, alice_b_final, bob_a_final, bob_b_final, _) = get_balances(&mut banks_client, &test_options).await;
+    // assert_eq!(alice_a_before-multiple, alice_a_final);
+    assert_eq!(alice_b_before+strike*multiple, alice_b_final);
+    let bob_acc_after = banks_client.get_account(test_options.bob_acc.pubkey()).await.unwrap().unwrap().lamports;
+    assert_eq!(bob_acc_before+multiple*LAMPORTS_PER_SOL, bob_acc_after);
+    assert_eq!(bob_b_before-strike*multiple, bob_b_final);
+    check_closed(&test_options, &mut banks_client).await;
+}
 
 
 #[tokio::test]
@@ -198,6 +279,55 @@ async fn test_create_then_exercise_put() {
     assert_eq!(alice_b_before-strike*multiple, alice_b_final);
     assert_eq!(bob_a_before-multiple, bob_a_final);
     assert_eq!(bob_b_before+strike*multiple, bob_b_final);
+    check_closed(&test_options, &mut banks_client).await;
+}
+
+#[tokio::test]
+async fn test_create_then_exercise_put_native() {
+    let current_time: i64 = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs().try_into().unwrap();
+
+    let strike : u64 = 69;
+    let multiple : u64 = 420;
+    let expiry : i64 = current_time + 600; // expire 10 mins from now
+    let kind : u8 = 1; //put
+
+    let (mut banks_client, recent_blockhash, mut test_options) = start_test().await;
+    let (alice_a_before, alice_b_before, bob_a_before, bob_b_before, alice_nft_before) = get_balances(&mut banks_client, &test_options).await;
+    assert_eq!(alice_nft_before, 0);
+    // let alice_acc_before = banks_client.get_balance(test_options.alice_acc.pubkey()).await.unwrap();
+    test_options.alice_b = Keypair::new();
+    test_options.alice_b_key = test_options.alice_a.pubkey();
+    test_options.tok_b_key = spl_token::native_mint::id();
+    token_actions::create_account(&mut banks_client, &test_options.alice_acc, recent_blockhash, &test_options.alice_b, 
+        &spl_token::native_mint::id(), &test_options.alice_acc.pubkey()).await.unwrap();
+    create_option(strike, multiple, expiry, kind, &mut test_options, &mut banks_client, recent_blockhash).await;
+
+    // check collateral moved
+    // let alice_acc_after = banks_client.get_balance(test_options.alice_acc.pubkey()).await.unwrap();
+    let (alice_a_after, alice_b_after, _, _, alice_nft_after) = get_balances(&mut banks_client, &test_options).await;
+    let collateral_acc = banks_client.get_account(test_options.collateral_acc.pubkey()).await.unwrap().unwrap();
+    let rent = banks_client.get_rent().await.unwrap();
+    let account_rent = rent.minimum_balance(spl_token::state::Account::LEN);
+    assert_eq!(collateral_acc.lamports, strike*multiple*LAMPORTS_PER_SOL+account_rent);
+    assert_eq!(alice_nft_after, 1);
+   
+    // alice transfers token to bob
+    alice_sends_nft_to_bob(&mut banks_client, &test_options, recent_blockhash).await;
+    let (_, _, _, _, alice_nft_after_send) = get_balances(&mut banks_client, &test_options).await;
+    assert_eq!(alice_nft_after_send, 0); //sent to bob
+
+    // bob sends an exercise instruction
+    let bob_acc_before = banks_client.get_balance(test_options.bob_acc.pubkey()).await.unwrap();
+    exercise_option(strike, multiple, kind, &test_options, &mut banks_client, recent_blockhash).await;
+    let (alice_a_final, alice_b_final, bob_a_final, bob_b_final, alice_nft_final) = get_balances(&mut banks_client, &test_options).await;
+    let bob_acc_after = banks_client.get_balance(test_options.bob_acc.pubkey()).await.unwrap();
+    
+    // check final balances
+    assert_eq!(alice_nft_final, 0);
+    assert_eq!(alice_a_before+multiple, alice_a_final);
+    // assert_eq!(alice_b_before-strike*multiple, alice_b_final);
+    assert_eq!(bob_a_before-multiple, bob_a_final);
+    assert_eq!(bob_acc_before+strike*multiple*LAMPORTS_PER_SOL, bob_acc_after);
     check_closed(&test_options, &mut banks_client).await;
 }
 
@@ -436,6 +566,7 @@ async fn exercise_option(strike: u64, multiple: u64, kind: u8,
         AccountMeta::new_readonly(spl_token::id(), false),
         AccountMeta::new(test_options.options_acc.pubkey(), false),
         AccountMeta::new(pda, false),
+        AccountMeta::new_readonly(system_program::id(), false),
     ];
 
     let exercise_tx = Transaction::new_signed_with_payer(
