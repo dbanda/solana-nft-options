@@ -20,11 +20,8 @@ import { getOrCreateAccounts, isOwned, isTokenAccountAvailable, NETWORK_TO_URI, 
 import { Connection, PublicKey } from '@solana/web3.js';
 import { Alert, FormControlLabel, FormGroup, Switch } from '@mui/material';
 import { close_option, Contract, exercise_call, exercise_put, get_contract_from_blockchain, print_contract } from 'solana-options';
-import { TryRounded } from '@mui/icons-material';
 
-const SERVER = "http://localhost:3000/"
 const INTERVAL = 30_000
-var NETWORK = ""
 declare const window: any;
 
 const style = {
@@ -62,7 +59,7 @@ const columns = [
   { id: 'writer_recv_acc', label: 'receive account' },
 ]
 
-export type tableProps = { network?: string, newRows?: any[], nft?: string | null  };
+export type tableProps = { network?: string, newRows?: any[], nft?: string | null };
 const ROW_CACHE: any = {}
 
 export default class ContractTable extends React.Component<tableProps>{
@@ -124,7 +121,7 @@ export default class ContractTable extends React.Component<tableProps>{
       this.setState({ network: this.props.network, rows: [this.getExample()[0]] })
       this.getData()
     }
-    if (this.props.newRows != prevProps.newRows) {
+    if (this.props.newRows !== prevProps.newRows) {
       this.setState({ network: this.props.network, rows: prevProps.newRows })
       this.getData()
     }
@@ -149,7 +146,7 @@ export default class ContractTable extends React.Component<tableProps>{
     } else {
       new TokenListProvider().resolve().then((tokens) => {
         const tokenList = tokens.filterByClusterSlug(
-          (this.state.network as string).toLowerCase() == "localnet"?  'mainnet-beta': (this.state.network as string).toLowerCase()
+          (this.state.network as string).toLowerCase() === "localnet" ? 'mainnet-beta' : (this.state.network as string).toLowerCase()
         ).getList();
         console.log("tokenlist", tokenList);
         this.TOKEN_MAP = new Map(tokenList.map(t => [t.address, t]));
@@ -187,7 +184,7 @@ export default class ContractTable extends React.Component<tableProps>{
     return false
   }
 
-  isNotExpired(row: any){
+  isNotExpired(row: any) {
     let today = dayjs();
     if (today <= dayjs(row.expiry * 1000)) {
       return util.format("You can only close expired contracts. This contract expires on %s , today is %s", dayjs(row.expiry * 1000).format(), today.format())
@@ -212,25 +209,25 @@ export default class ContractTable extends React.Component<tableProps>{
           .sort((a, b) => b.timestamp - a.timestamp)
 
         const filter = async (rows: any[]) => {
-          if (this.props.nft){
-            rows = rows.filter(x=>x.nft_id==this.props.nft?.trim())
+          if (this.props.nft) {
+            rows = rows.filter(x => x.nft_id === this.props.nft?.trim())
           }
 
           if (!this.state.show_closed) { // if showing everythig this is a no-op
             var counter = rows.length
             for (let i = 0; i < rows.length; i++) {
-              if (rows[i].account_id in ROW_CACHE){
+              if (rows[i].account_id in ROW_CACHE) {
                 rows[i].show = ROW_CACHE[rows[i].account_id].show
                 counter -= 1
-                this.setState({ rows: this.state.rows, loading_rows: (counter <= 0)? false : true }) // refresh state
-              }else {
+                this.setState({ rows: this.state.rows, loading_rows: (counter <= 0) ? false : true }) // refresh state
+              } else {
                 // asynchronously update the live property
-                this.isLiveAccount(rows[i].account_id, conn).then(ac =>{
+                this.isLiveAccount(rows[i].account_id, conn).then(ac => {
                   rows[i].show = ac
                   ROW_CACHE[rows[i].account_id] = rows[i]
                   console.log("isliveaccount", rows[i], ac)
                   counter -= 1
-                  this.setState({ rows: this.state.rows, loading_rows: (counter <= 0)? false : true }) // refresh state
+                  this.setState({ rows: this.state.rows, loading_rows: (counter <= 0) ? false : true }) // refresh state
                 })
               }
             }
@@ -266,7 +263,7 @@ export default class ContractTable extends React.Component<tableProps>{
 
               row.strike_instrument = <a href={'https://explorer.solana.com/address/' + row.strike_instrument + "?cluster=" + uri}>{row.strike_instrument}</a>
               row.instrument = <a href={'https://explorer.solana.com/address/' + row.instrument + "?cluster=" + uri}>{row.instrument}</a>
-              row.nft_id = <a href={'https://explorer.solana.com/address/' + row.nft_id + "?cluster="+ uri}>{row.nft_id}</a>
+              row.nft_id = <a href={'https://explorer.solana.com/address/' + row.nft_id + "?cluster=" + uri}>{row.nft_id}</a>
               row.writer_recv_acc = <a href={'https://explorer.solana.com/address/' + row.writer_recv_acc + "?cluster=" + uri}>{row.writer_recv_acc}</a>
               return row
             })
@@ -308,11 +305,11 @@ export default class ContractTable extends React.Component<tableProps>{
       return this.setState({ row_show_alert: "This contract is already closed, exercised, or expired", row_busy: false })
     }
 
-    if (action == ContractAction.exercise && this.isExpired(row)) {
+    if (action === ContractAction.exercise && this.isExpired(row)) {
       return this.setState({ row_show_alert: this.isExpired(row), row_busy: false })
     }
 
-    if (action == ContractAction.close && this.isNotExpired(row)) {
+    if (action === ContractAction.close && this.isNotExpired(row)) {
       return this.setState({ row_show_alert: this.isNotExpired(row), row_busy: false })
     }
 
@@ -341,22 +338,22 @@ export default class ContractTable extends React.Component<tableProps>{
 
       var inst_acc: PublicKey
       var strike_inst_acc: PublicKey
-      try{
+      try {
         [inst_acc, strike_inst_acc] = await getOrCreateAccounts(conn, contract.instrument.toString(), contract.strike_instrument.toString(), this.state.user)
-      }catch(e){
-        console.error("could not get or create", contract.instrument.toString(), contract.strike_instrument.toString() )
+      } catch (e) {
+        console.error("could not get or create", contract.instrument.toString(), contract.strike_instrument.toString())
         this.setState({
-          row_show_alert: util.format("Could not get or create accounts for one of mints %s, %s", contract.instrument.toString(), contract.strike_instrument.toString() ),
-          row_busy: false 
+          row_show_alert: util.format("Could not get or create accounts for one of mints %s, %s", contract.instrument.toString(), contract.strike_instrument.toString()),
+          row_busy: false
         })
-        throw "could not get or create accounts for mints"
+        throw new Error("could not get or create accounts for mints")
       }
 
-      if (action == ContractAction.exercise) {
+      if (action === ContractAction.exercise) {
         console.log("exercising", print_contract(contract))
         try {
-          this.setState({row_show_msg: "Exercising option contract on blockchain... This may take a while."})
-          if (contract.kind as OptionType == Kind.call) {
+          this.setState({ row_show_msg: "Exercising option contract on blockchain... This may take a while." })
+          if (contract.kind as OptionType === Kind.call) {
             let sig = await exercise_call(conn, contract, this.state.user, nft_tok_acc as PublicKey, inst_acc, strike_inst_acc)
             await conn.confirmTransaction(sig as string, "finalized")
           } else {
@@ -364,34 +361,34 @@ export default class ContractTable extends React.Component<tableProps>{
             await conn.confirmTransaction(sig as string, "finalized")
           }
 
-        }catch(e){
-          this.setState({row_show_alert: util.format ("Error exercising contract: %s", e), row_busy: false })
-          throw "error exercising contract"
+        } catch (e) {
+          this.setState({ row_show_alert: util.format("Error exercising contract: %s", e), row_busy: false })
+          throw new Error("error exercising contract")
         }
 
       } else {
         console.log("closing", print_contract(contract))
         // let [inst_acc, strike_inst_acc] = await getOrCreateAccounts(conn, contract.instrument.toString(), contract.strike_instrument.toString(), this.state.user)
-        try{
-          this.setState({row_show_msg: "Closing option contract on blockchain... This may take a while."})
-          if (contract.kind as OptionType == Kind.call) {
-            
+        try {
+          this.setState({ row_show_msg: "Closing option contract on blockchain... This may take a while." })
+          if (contract.kind as OptionType === Kind.call) {
+
             let sig = await close_option(conn, contract, this.state.user, inst_acc)
             await conn.confirmTransaction(sig as string, "finalized")
           } else {
             let sig = await close_option(conn, contract, this.state.user, strike_inst_acc)
             await conn.confirmTransaction(sig as string, "finalized")
           }
-        }catch(e){
-          this.setState({row_show_alert: util.format ("Error exercising contract: %s", e), row_busy: false })
-          throw "error exercising contract"
+        } catch (e) {
+          this.setState({ row_show_alert: util.format("Error exercising contract: %s", e), row_busy: false })
+          throw new Error("error exercising contract")
         }
 
 
       }
 
       // exercise_put()
-      this.setState({row_busy: false, row_show_msg: "Done!" })
+      this.setState({ row_busy: false, row_show_msg: "Done!" })
       this.getData()
     }
 
@@ -403,9 +400,9 @@ export default class ContractTable extends React.Component<tableProps>{
     return resp
   }
 
-  async sendNFT(conn: Connection, nft_account: PublicKey, receiver:PublicKey){
+  async sendNFT(conn: Connection, nft_account: PublicKey, receiver: PublicKey) {
     await patchConnection(conn, this.state.user)
-    this.setState({row_show_alert: null, row_show_msg: "Sending ..."});
+    this.setState({ row_show_alert: null, row_show_msg: "Sending ..." });
     return transferNFT(conn, nft_account, receiver, this.state.user)
   }
 
@@ -416,45 +413,45 @@ export default class ContractTable extends React.Component<tableProps>{
     var receiver: PublicKey;
     try {
       receiver = new PublicKey(this.state.receiver)
-    }catch {
-      return this.setState({row_show_alert: "Invalid receiver address: '"+ this.state.receiver+"'", row_busy: false,  row_show_msg: null})
+    } catch {
+      return this.setState({ row_show_alert: "Invalid receiver address: '" + this.state.receiver + "'", row_busy: false, row_show_msg: null })
     }
-    
+
     let uri = NETWORK_TO_URI[(this.state.network as string).toLowerCase()]
     console.log("connecting to", this.state.network, uri)
     let conn = new Connection(uri);
-    
+
 
     let nft_account = new PublicKey(row.nft_account)
     this.login().then((resp: { publicKey: { toString: () => any; }; }) => {
       console.log("pubkey", resp, resp.publicKey.toString())
       this.setState({ user: resp })
-      this.sendNFT(conn, nft_account, receiver).then((s)=>{
+      this.sendNFT(conn, nft_account, receiver).then((s) => {
         console.log("confirmation", s)
-        this.setState({row_busy: false, row_show_alert: null, row_show_msg: "Done!"});
-      }).catch(e=>{
-        this.setState({row_busy: false, row_show_msg: null, row_show_alert: "Error sending NFT: " + JSON.stringify(e)})
+        this.setState({ row_busy: false, row_show_alert: null, row_show_msg: "Done!" });
+      }).catch(e => {
+        this.setState({ row_busy: false, row_show_msg: null, row_show_alert: "Error sending NFT: " + JSON.stringify(e) })
       })
-    }).catch(e=>{
-      this.setState({row_busy: false,  row_show_msg: null, row_show_alert: "Phantom wallet login failed: " + JSON.stringify(e)})
+    }).catch(e => {
+      this.setState({ row_busy: false, row_show_msg: null, row_show_alert: "Phantom wallet login failed: " + JSON.stringify(e) })
     })
 
 
   }
 
   async checkOwnership(conn: Connection, row: any) {
-    let owned =  await isOwned(conn, new PublicKey(row.nft_id_key), new PublicKey(row.nft_account), this.state.user)
-    console.log("owned", owned, owned<0)
-    if (owned < 0){
-      return this.setState({row_show_alert: "Did not find an account holding this NFT in your wallet", row_busy: false}) 
-    } else if (owned == 0){
-      return this.setState({row_show_alert: "You already sent this NFT", row_busy:false})
+    let owned = await isOwned(conn, new PublicKey(row.nft_id_key), new PublicKey(row.nft_account), this.state.user)
+    console.log("owned", owned, owned < 0)
+    if (owned < 0) {
+      return this.setState({ row_show_alert: "Did not find an account holding this NFT in your wallet", row_busy: false })
+    } else if (owned === 0) {
+      return this.setState({ row_show_alert: "You already sent this NFT", row_busy: false })
     }
-    
-  
+
+
     this.setState({ row_busy: false, open_transfer: true, open_row: false })
   }
-  
+
   transfer_evt(e: any, row: any, action: ContractAction) {
     e.preventDefault();
     console.log("clicked transfer", row, this, e)
@@ -464,9 +461,9 @@ export default class ContractTable extends React.Component<tableProps>{
     let conn = new Connection(uri);
 
     console.log("transfering ownership to bob")
-    this.checkOwnership(conn, row).then(()=>{
+    this.checkOwnership(conn, row).then(() => {
       console.log("ownership confirmed for", this.state.user)
-    }).catch(e=>{
+    }).catch(e => {
       this.setState({ row_busy: false, row_show_alert: "Error " + e })
     })
 
@@ -477,7 +474,7 @@ export default class ContractTable extends React.Component<tableProps>{
     e.preventDefault();
     console.log("clicked exercise", this, e)
 
-    this.setState({ row_busy: true, row_show_msg: null, row_show_alert: null})
+    this.setState({ row_busy: true, row_show_msg: null, row_show_alert: null })
 
     this.login().then((resp: { publicKey: { toString: () => any; }; }) => {
       console.log("pubkey", resp, resp.publicKey.toString())
@@ -491,15 +488,13 @@ export default class ContractTable extends React.Component<tableProps>{
   getRowOnClick(row: any) {
     return (e: any) => {
       console.log(e.target.tagName)
-      if (e.target.tagName == "TD") {
+      if (e.target.tagName === "TD") {
         this.setState({ open_row: true, row: row })
       }
-
     }
   }
 
   render() {
-    let className = 'contracttable';
     return (
       <Paper sx={{ width: '100%', overflow: 'hidden' }}>
         <FormGroup sx={{ m: "15px" }}>
@@ -533,7 +528,7 @@ export default class ContractTable extends React.Component<tableProps>{
             <TableBody>
               {this.state.rows
                 .slice(this.state.page * this.state.rowsPerPage, this.state.page * this.state.rowsPerPage + this.state.rowsPerPage)
-                .filter((r:any) => this.state.show_closed || r.show)
+                .filter((r: any) => this.state.show_closed || r.show)
                 .map((row: { [x: string]: any; }, ir: string) => {
                   return (
                     <TableRow sx={{ cursor: "pointer" }} hover role="checkbox" tabIndex={-1} key={"" + ir} onClick={this.getRowOnClick(row)}>
@@ -704,8 +699,8 @@ export default class ContractTable extends React.Component<tableProps>{
                 </Alert>
               )
             }
-            <Typography  sx={{ mt: 2 }}>
-                This will transfer the NFT {this.state.row.nft_id} to the receipient 
+            <Typography sx={{ mt: 2 }}>
+              This will transfer the NFT {this.state.row.nft_id} to the receipient
             </Typography>
             <br></br>
             <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }}>
@@ -713,7 +708,7 @@ export default class ContractTable extends React.Component<tableProps>{
                 Receiver's address:
               </Grid>
               <Grid item xs={8}>
-                <input type={"text"} placeholder='Receivers public key' onChange={e=>{this.setState({receiver: e.target.value})}}></input>
+                <input type={"text"} placeholder='Receivers public key' onChange={e => { this.setState({ receiver: e.target.value }) }}></input>
               </Grid>
             </Grid>
             <br></br>

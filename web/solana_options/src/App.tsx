@@ -25,7 +25,7 @@ function App() {
   );
 
   let selected_network = window.sessionStorage.getItem("network");
-  if (selected_network && selected_network != network){
+  if (selected_network && selected_network !== network){
     setNetwork(selected_network);
   }
 
@@ -41,7 +41,7 @@ function App() {
               sx={{ mr: 2, display: { xs: 'none', md: 'flex' } }}
             >
               {/* LOGO  */}
-              <img src="logo_alpha_512.png" style={{ maxHeight: "2.25rem" }}></img>
+              <img src="logo_alpha_512.png" alt='solana nft options logo' style={{ maxHeight: "2.25rem" }}></img>
             </Typography>
             <Typography
               variant="h6"
@@ -50,7 +50,7 @@ function App() {
               sx={{ flexGrow: 1, display: { xs: 'flex', md: 'none' } }}
             >
               {/* LOGO  */}
-              <img src="logo_alpha_512.png" style={{ maxHeight: "2.25rem" }}></img>
+              <img src="logo_alpha_512.png" alt='solana nft options logo' style={{ maxHeight: "2.25rem" }}></img>
             </Typography>
             <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'flex' } }}>
             </Box>

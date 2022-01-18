@@ -25,12 +25,11 @@ export async function isTokenAccountAvailable(conn: Connection, addr: string, ow
 
 
 export async function patchConnection(conn: Connection, fee_payer: Signer) {
-    var originalSend = conn.sendTransaction;
-    originalSend = originalSend.bind(conn)
+    let originalSend = conn.sendTransaction;
+    originalSend.bind(conn)
     const patchedSend = async (transaction: Transaction,
         signers: Array<Signer>,
         options?: SendOptions): Promise<any> => {
-        // transaction = new Transaction()
         let { blockhash } = await conn.getRecentBlockhash();
         transaction.recentBlockhash = blockhash;
         transaction.feePayer = fee_payer.publicKey;

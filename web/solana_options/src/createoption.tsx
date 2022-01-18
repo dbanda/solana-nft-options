@@ -9,9 +9,9 @@ import Modal from '@mui/material/Modal';
 import Jimp from 'jimp';
 import { Contract, create_call, create_doc_img, create_put, print_contract, publish_doc } from "solana-options";
 import { ASSOCIATED_TOKEN_PROGRAM_ID, Token, TOKEN_PROGRAM_ID } from "@solana/spl-token";
-import { TokenListProvider, TokenInfo, CLUSTER_SLUGS } from '@solana/spl-token-registry';
+import { TokenListProvider, TokenInfo } from '@solana/spl-token-registry';
 import { PublicKey, Connection, Transaction, SendOptions, Signer } from '@solana/web3.js';
-import { Alert, Grid, TextField, useTabsList } from '@mui/material';
+import { Alert, Grid } from '@mui/material';
 import { NETWORK_TO_URI } from './utils';
 
 declare const window: any;
@@ -33,7 +33,7 @@ const style = {
     p: 4,
 };
 
-export type createProps = { network?: string, handleNewContract: (c: Contract)=>void };
+export type createProps = { network?: string, handleNewContract: (c: Contract) => void };
 
 export default class CreateOption extends React.Component<createProps>{
     TOKEN_LIST?: TokenInfo[] = undefined
@@ -131,8 +131,8 @@ export default class CreateOption extends React.Component<createProps>{
         }
         let tokens = await new TokenListProvider().resolve()
         const tokenList = tokens.filterByClusterSlug(
-            (this.state.network as string).toLowerCase() == "localnet"?  'devnet': (this.state.network as string).toLowerCase()
-          ).getList();    
+            (this.state.network as string).toLowerCase() === "localnet" ? 'devnet' : (this.state.network as string).toLowerCase()
+        ).getList();
         this.TOKEN_LIST = tokenList;
         return this.getTokenList()
     }
@@ -141,12 +141,11 @@ export default class CreateOption extends React.Component<createProps>{
         let conn = new Connection(uri);
         // patch conn to use phantom
 
-        var originalSend = conn.sendTransaction;
-        originalSend = originalSend.bind(conn)
+        let originalSend = conn.sendTransaction;
+        originalSend.bind(conn)
         const patchedSend = async (transaction: Transaction,
             signers: Array<Signer>,
             options?: SendOptions): Promise<any> => {
-            // transaction = new Transaction()
             let { blockhash } = await conn.getRecentBlockhash();
             transaction.recentBlockhash = blockhash;
             transaction.feePayer = this.state.user.publicKey;
@@ -166,25 +165,26 @@ export default class CreateOption extends React.Component<createProps>{
         try {
             new PublicKey(instrument)
             new PublicKey(strike_instrument)
-        }catch{
-            console.error("could not find keys for mints", instrument, strike_instrument )
-            this.setState({show_alert: util.format ("Could not find keys for one of mints %s, %s", instrument, strike_instrument ), progress: false })
-            throw util.format ("Could not find keys for one of mints %s, %s", instrument, strike_instrument )
+        } catch {
+            console.error("could not find keys for mints", instrument, strike_instrument)
+            this.setState({ show_alert: util.format("Could not find keys for one of mints %s, %s", instrument, strike_instrument), progress: false })
+            throw util.format("Could not find keys for one of mints %s, %s", instrument, strike_instrument)
         }
 
         var instr_acc: PublicKey
         var stike_instr_acc: PublicKey
-        try{
-            this.setState({show_msg: "Getting accounts. This may take a sec"});
+        try {
+            this.setState({ show_msg: "Getting accounts. This may take a sec" });
             [instr_acc, stike_instr_acc] = await this.getOrCreateAccounts(conn, instrument, strike_instrument)
-        }catch(e) {
-            console.error("could not get or create", instrument, strike_instrument, e )
+        } catch (e) {
+            console.error("could not get or create", instrument, strike_instrument, e)
             this.setState({
-                show_alert: util.format ("Could not get or create accounts for one of mints %s, %s. err %s", instrument, strike_instrument,e ), 
-                progress: false, show_msg: null })
-            throw util.format("Could not get or create accounts for one of mints %s, %s. err %s", instrument, strike_instrument,e )
+                show_alert: util.format("Could not get or create accounts for one of mints %s, %s. err %s", instrument, strike_instrument, e),
+                progress: false, show_msg: null
+            })
+            throw util.format("Could not get or create accounts for one of mints %s, %s. err %s", instrument, strike_instrument, e)
         }
-        
+
 
         console.log("mint accounts", instr_acc, stike_instr_acc)
 
@@ -195,25 +195,25 @@ export default class CreateOption extends React.Component<createProps>{
         conn.sendTransaction = patchedSend
         var sig: string
         var contract: Contract
-        try{
-            if (kind == Kind.call){
-                this.setState({show_msg: "Creating call contract on blockchain... This may take a sec after approving"});
+        try {
+            if (kind === Kind.call) {
+                this.setState({ show_msg: "Creating call contract on blockchain... This may take a sec after approving" });
                 [sig, contract] = await create_call(
                     conn, strike, expiry, multiple, this.state.user, new PublicKey(instrument), new PublicKey(strike_instrument),
                     instr_acc, stike_instr_acc
                 )
-            }else {
-                this.setState({show_msg: "Creating put contract on blockchain ... This may take a sec after approving"});
+            } else {
+                this.setState({ show_msg: "Creating put contract on blockchain ... This may take a sec after approving" });
                 [sig, contract] = await create_put(
                     conn, strike, expiry, multiple, this.state.user, new PublicKey(instrument), new PublicKey(strike_instrument),
                     instr_acc, stike_instr_acc
                 )
             }
-            this.setState({show_msg:null})
+            this.setState({ show_msg: null })
 
-        }catch(e){
-            console.error("transaction error", e )
-            this.setState({show_alert: util.format ("Transaction error: %s", e), progress: false })
+        } catch (e) {
+            console.error("transaction error", e)
+            this.setState({ show_alert: util.format("Transaction error: %s", e), progress: false })
             throw e
         }
 
@@ -248,47 +248,47 @@ export default class CreateOption extends React.Component<createProps>{
                         let uri = NETWORK_TO_URI[(this.state.network as string).toLowerCase()]
                         let conn = new Connection(uri);
                         try {
-                            this.setState({show_msg: "Confirming ..."});
+                            this.setState({ show_msg: "Confirming ..." });
                             await conn.confirmTransaction(sig as string, "finalized")
-                            this.setState({show_msg: "Confirmed!"});
-                            
-                        } catch(e){
-                            this.setState({show_alert: util.format ("Error confirming transaction: %s", e), progress: false })
+                            this.setState({ show_msg: "Confirmed!" });
+
+                        } catch (e) {
+                            this.setState({ show_alert: util.format("Error confirming transaction: %s", e), progress: false })
                         }
 
                         try {
 
                             // download contract
-                            
+
                             let a: any = document.createElement("a");
                             a.style = "display: none";
                             document.body.appendChild(a);
                             let data_str = "data:text/json;charset=utf-8," +
-                                encodeURIComponent(JSON.stringify( print_contract(contract as Contract), null ,4));
+                                encodeURIComponent(JSON.stringify(print_contract(contract as Contract), null, 4));
                             a.href = data_str;
-                            a.download = "contact_" + Math.floor(10_000*Math.random()) + ".json";
-                            this.setState({show_msg: "Downloading and sharing contract"});
+                            a.download = "contact_" + Math.floor(10_000 * Math.random()) + ".json";
+                            this.setState({ show_msg: "Downloading and sharing contract" });
                             a.click();
 
                             await publish_doc(contract as Contract)
                             this.props.handleNewContract(contract as Contract)
                             const img = await create_doc_img(contract as Contract);
-                           
+
                             console.log("calling cb", !!img);
                             img.getBase64Async(Jimp.MIME_PNG).then(b64 => {
                                 a.href = b64;
-                                a.download = "contact_" + Math.floor(10_000*Math.random()) + ".png";;
+                                a.download = "contact_" + Math.floor(10_000 * Math.random()) + ".png";;
                                 a.click();
                                 window.URL.revokeObjectURL(b64);
                             });
                             this.setState({ progress: false, show_msg: "Done!" });
                             // window.location.reload(false);
-                        }catch(e){
+                        } catch (e) {
                             this.props.handleNewContract(contract as Contract)
-                            this.setState({show_alert: util.format ("Error publishing or creating doc %s", e), progress: false, show_msg: null })
+                            this.setState({ show_alert: util.format("Error publishing or creating doc %s", e), progress: false, show_msg: null })
                         }
-                    }).catch((e)=>{
-                        this.setState({show_alert: util.format ("Transaction error: %s", e), progress: false })
+                    }).catch((e) => {
+                        this.setState({ show_alert: util.format("Transaction error: %s", e), progress: false })
                     })
             })
         }
@@ -300,7 +300,7 @@ export default class CreateOption extends React.Component<createProps>{
             let resp = await phantom.connect()
             return resp
         } else {
-            throw "not logged in";
+            throw new Error("not logged in");
         }
     }
 
@@ -360,9 +360,9 @@ export default class CreateOption extends React.Component<createProps>{
                             )}
                             <br></br>
 
-                            <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }} sx={{p:"4px"}}>
+                            <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }} sx={{ p: "4px" }}>
                                 <Grid item xs={5}>
-                                    instrument: 
+                                    instrument:
                                 </Grid>
                                 <Grid item xs={7}>
                                     <input name="instrument" required placeholder="SOL" defaultValue="SOL"></input>
@@ -372,7 +372,7 @@ export default class CreateOption extends React.Component<createProps>{
                                 </Grid>
                                 <Grid item xs={7}>
                                     <input name="strike_instrument" required placeholder="SOL" defaultValue="SOL" ></input>
-                                </Grid>                                
+                                </Grid>
                                 <Grid item xs={5}>
                                     strike:
                                 </Grid>
