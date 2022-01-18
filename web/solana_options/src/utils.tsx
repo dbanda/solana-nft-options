@@ -5,8 +5,8 @@ declare const window: any;
 export const NETWORK_TO_URI: Record<string, string> = {
     'mainet-beta': "https://api.mainnet-beta.solana.com",
     'devnet': "https://api.devnet.solana.com",
-    'testnet': " wget http://api.testnet.solana.com/",
-    'localnet': " http://localhost:8899"
+    'testnet': "https://api.testnet.solana.com/",
+    'localnet': "http://localhost:8899"
 }
 
 export async function isTokenAccountAvailable(conn: Connection, addr: string, owner: Signer) {

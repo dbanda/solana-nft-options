@@ -156,7 +156,7 @@ export default class ContractTable extends React.Component<tableProps>{
   }
 
   getNewData() {
-    fetch("contracts/count/")
+    fetch("https://nftoptions.app/contracts/count/")
       .then(response => response.json())
       .then(data => {
         console.log(this, data.count, this.state)
@@ -221,14 +221,16 @@ export default class ContractTable extends React.Component<tableProps>{
                 counter -= 1
                 this.setState({ rows: this.state.rows, loading_rows: (counter <= 0) ? false : true }) // refresh state
               } else {
-                // asynchronously update the live property
-                this.isLiveAccount(rows[i].account_id, conn).then(ac => {
-                  rows[i].show = ac
-                  ROW_CACHE[rows[i].account_id] = rows[i]
-                  console.log("isliveaccount", rows[i], ac)
-                  counter -= 1
-                  this.setState({ rows: this.state.rows, loading_rows: (counter <= 0) ? false : true }) // refresh state
-                })
+                // asynchronously update the live property. 600ms delay
+                setTimeout(()=>{
+                  this.isLiveAccount(rows[i].account_id, conn).then(ac => {
+                    rows[i].show = ac
+                    ROW_CACHE[rows[i].account_id] = rows[i]
+                    console.log("isliveaccount", rows[i], ac)
+                    counter -= 1
+                    this.setState({ rows: this.state.rows, loading_rows: (counter <= 0) ? false : true }) // refresh state
+                  })
+                }, i*600)
               }
             }
           }
@@ -361,9 +363,15 @@ export default class ContractTable extends React.Component<tableProps>{
             await conn.confirmTransaction(sig as string, "finalized")
           }
 
-        } catch (e) {
-          this.setState({ row_show_alert: util.format("Error exercising contract: %s", e), row_busy: false })
-          throw new Error("error exercising contract")
+        } catch (e: any) {
+          var msg = util.format("Error exercising contract: %s %s", e.message, e.logs)
+
+          if (e.logs && msg.indexOf("insufficient funds")>-1){
+            msg = "insufficient funds in accounts"
+          }
+          this.setState({ row_show_alert: msg, row_busy: false })
+          // throw new Error("error exercising contract")
+          return
         }
 
       } else {

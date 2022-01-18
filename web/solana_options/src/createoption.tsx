@@ -365,19 +365,19 @@ export default class CreateOption extends React.Component<createProps>{
                                     instrument:
                                 </Grid>
                                 <Grid item xs={7}>
-                                    <input name="instrument" required placeholder="SOL" defaultValue="SOL"></input>
+                                    <input name="instrument" required placeholder="instrument symbol or address" defaultValue="wSOL"></input>
                                 </Grid>
                                 <Grid item xs={5}>
                                     strike instrument:
                                 </Grid>
                                 <Grid item xs={7}>
-                                    <input name="strike_instrument" required placeholder="SOL" defaultValue="SOL" ></input>
+                                    <input name="strike_instrument" required placeholder="strike symbol or address" defaultValue="USDC" ></input>
                                 </Grid>
                                 <Grid item xs={5}>
                                     strike:
                                 </Grid>
                                 <Grid item xs={7}>
-                                    <input name="strike" type="number" min="1" required placeholder="1" defaultValue="1"></input>
+                                    <input name="strike" type="number" min="1" required placeholder="1" defaultValue="140"></input>
                                 </Grid>
                                 <Grid item xs={5}>
                                     multiple:

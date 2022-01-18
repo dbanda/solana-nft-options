@@ -15,7 +15,7 @@ import { Contract, print_contract } from 'solana-options';
 
 
 function App() {
-  const [network, setNetwork] = React.useState("Devnet");
+  const [network, setNetwork] = React.useState("Testnet");
   const [rows, setRows] = React.useState<any>([]);
 
   let search = window.location.search;
@@ -71,7 +71,7 @@ function App() {
                 >
                   <MenuItem value={"Localnet"}>Localnet</MenuItem>
                   <MenuItem value={"Devnet"}>Devnet</MenuItem>
-                  <MenuItem value={"Testnet"}>Devnet</MenuItem>
+                  <MenuItem value={"Testnet"}>Testnet</MenuItem>
                   <MenuItem value={"Mainet-beta"}>Mainnet</MenuItem>
                 </Select>
               </FormControl>
