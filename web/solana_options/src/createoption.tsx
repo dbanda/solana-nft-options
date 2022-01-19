@@ -11,7 +11,7 @@ import { Contract, create_call, create_doc_img, create_put, print_contract, publ
 import { ASSOCIATED_TOKEN_PROGRAM_ID, Token, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { TokenListProvider, TokenInfo } from '@solana/spl-token-registry';
 import { PublicKey, Connection, Transaction, SendOptions, Signer } from '@solana/web3.js';
-import { Alert, FormControlLabel, FormGroup, Grid, Switch } from '@mui/material';
+import { Alert, FormControlLabel, Grid, Switch } from '@mui/material';
 import { NETWORK_DEFAULTS, NETWORK_TO_URI } from './utils';
 
 declare const window: any;
