@@ -109,6 +109,26 @@ You can create an image for your contract too and publish it to https://nftoptio
 
 ![sample](./docs/contract.png)
 
+## Contracts on minted NFTs
+
+You can also issue contracts on newly minted NFTs by setting the instrument to `null`. The will mint a new token and use it as the instrument token. For example, to create a call contract giving the buyer the right to by your one-of-a-kind NFT for 420 USDC you can do:
+
+```javascript
+    let strike = 420
+    let multiple = 1
+    let expiry = Date.now()/1000 + 600 //expire in 10 mins
+    let strike_instrument = "USDC"
+    // your account holding the strike instrument
+    let creator_strike_instrument_acc = new sol.PublicKey('9H39mHQDLNN1crrQFwRu5w8Euje5k3pfzKxkHaD51gXw')
+
+    create_call(
+        connection,strike, expiry, multiple, creator_acc, null, strike_instrument, 
+        null, creator_strike_instrument_acc
+    ).then(([sig, contract])=>{
+        console.log("Your newly minted NFT id" , printed_contract(contract)["instrument"])
+    })
+```
+
 ## Motivation
 
 ### What are options?

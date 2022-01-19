@@ -71,8 +71,8 @@ async function get_token_map(): Promise<Map<string,string>>{
  * @returns 
  */
 export async function create_call(connection: Connection, strike: number, expiry: number, multiple: number, creator_account: Signer, 
-    instrument: PublicKey | string, strike_instrument: PublicKey | string, creator_instrument_acc: PublicKey, 
-    creator_strike_instrument_acc: PublicKey)  : Promise<[string, Contract]>{
+    instrument: PublicKey | string | null, strike_instrument: PublicKey | string | null, creator_instrument_acc: PublicKey | null, 
+    creator_strike_instrument_acc: PublicKey | null)  : Promise<[string, Contract]>{
       console.log("creating call contract")
 
       return create_option(connection, strike, expiry, multiple, creator_account, instrument, 
@@ -94,15 +94,15 @@ export async function create_call(connection: Connection, strike: number, expiry
  * @returns 
  */
 export async function create_put(connection: Connection, strike: number, expiry: number, multiple: number, creator_account: Keypair, 
-  instrument: PublicKey, strike_instrument: PublicKey, creator_instrument_acc: PublicKey, 
-  creator_strike_instrument_acc: PublicKey)  : Promise<[string, Contract]>{
+  instrument: PublicKey | string | null, strike_instrument: PublicKey| string | null, creator_instrument_acc: PublicKey | null, 
+  creator_strike_instrument_acc: PublicKey | null)  : Promise<[string, Contract]>{
     console.log("creating put contract")
 
     return create_option(connection, strike, expiry, multiple, creator_account, instrument, 
       strike_instrument, creator_instrument_acc, creator_strike_instrument_acc, OptionType.put)
 }
 
-async function create_new_nft_mint(connection: Connection, multiple: number, creator_account: Signer) {
+export async function create_new_nft_mint(connection: Connection, multiple: number, creator_account: Signer) {
     const instrument_mint_acc = new Keypair();
     console.log("instrument mint account key: ", instrument_mint_acc.publicKey.toString())
     const mint_rent = await connection.getMinimumBalanceForRentExemption(MintLayout.span, 'confirmed')
@@ -178,7 +178,7 @@ async function create_new_nft_mint(connection: Connection, multiple: number, cre
 }
 
 export async function create_option(connection: Connection, strike: number, expiry: number, multiple: number, creator_account: Signer, 
-  instrument: PublicKey | string, strike_instrument: PublicKey | string, creator_instrument_acc: PublicKey, creator_strike_instrument_acc: PublicKey, kind: OptionType) : Promise<[string, Contract]>{
+  instrument: PublicKey | string | null, strike_instrument: PublicKey | string | null, creator_instrument_acc: PublicKey | null, creator_strike_instrument_acc: PublicKey, kind: OptionType) : Promise<[string, Contract]>{
     
     // check if the either instrument or strike_instrument is a symbol or address(public); assume symbol if string
     if (typeof instrument == "string" || typeof strike_instrument == "string"){
