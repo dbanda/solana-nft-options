@@ -1,6 +1,6 @@
 # Solana NFT Options (BETA)
 This is a tool for creating and exercising options contracts for tokens and NFTs on the Solana blockchain. This program is currently running on devnet.
-See https://nftoptions.app
+See https://nftoptions.app, get the client on npm https://www.npmjs.com/package/solana-options
 
 ### Table of Contents  
 [Installation](#installation)  
