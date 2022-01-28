@@ -1,4 +1,4 @@
-import './App.css';
+// import './App.css';
 import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
 import Toolbar from '@mui/material/Toolbar';
@@ -12,22 +12,42 @@ import FormControl from '@mui/material/FormControl';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 import * as React from 'react';
 import { Contract, print_contract } from 'solana-options';
-
+import {
+  WalletConnectButton as ReactUIWalletConnectButton,
+  WalletDisconnectButton as ReactUIWalletDisconnectButton,
+  WalletModalButton as ReactUIWalletModalButton,
+  WalletMultiButton as ReactUIWalletMultiButton,
+} from '@solana/wallet-adapter-react-ui';
+import {
+  WalletConnectButton as MaterialUIWalletConnectButton,
+  WalletDialogButton as MaterialUIWalletDialogButton,
+  WalletDisconnectButton as MaterialUIWalletDisconnectButton,
+  WalletMultiButton as MaterialUIWalletMultiButton,
+} from '@solana/wallet-adapter-material-ui';
+import { TableCell, TableRow, ThemeProvider } from '@mui/material';
+import { useWallet } from '@solana/wallet-adapter-react';
+import theme from './theme';
 
 function App() {
+  
   const [network, setNetwork] = React.useState("Testnet");
   const [rows, setRows] = React.useState<any>([]);
+  let [query, setQuery] = React.useState<string| null>(null)
+  const wallet_ctx = useWallet();
 
-  let search = window.location.search;
-  let params = new URLSearchParams(search);
-  let [query, setQuery] = React.useState(
-    params.get('nft')
-  );
+  React.useEffect(()=>{
+    let search = window.location.search;
+    let params = new URLSearchParams(search);
+    if (params){
+      setQuery(params.get('nft'))
+    }
+  
+    let selected_network = window.sessionStorage.getItem("network");
+    if (selected_network && selected_network !== network){
+      setNetwork(selected_network);
+    }
+  })
 
-  let selected_network = window.sessionStorage.getItem("network");
-  if (selected_network && selected_network !== network){
-    setNetwork(selected_network);
-  }
 
   return (
     <div className="App">
@@ -113,8 +133,15 @@ function App() {
         <br></br>
       </header>
       {/* <Toolbar disableGutters></Toolbar> */}
-      <CreateOption network={network} handleNewContract={(c: Contract)=>{setRows([print_contract(c)])}}></CreateOption>
-      <ContractTable network={network} newRows={rows} nft={query}></ContractTable>
+      <Box sx={{ flexGrow: 1, px: 3, my: "20px", textAlign: 'center' }}>
+        <CreateOption network={network} handleNewContract={(c: Contract)=>{setRows([print_contract(c)])}} wallet_ctx={wallet_ctx}></CreateOption>
+        <MaterialUIWalletMultiButton />
+      </Box>
+      <br></br>
+      <ThemeProvider theme={theme}>
+        <ContractTable network={network} newRows={rows} nft={query} wallet_ctx={wallet_ctx}></ContractTable>
+      </ThemeProvider>
+
 
 
     </div>

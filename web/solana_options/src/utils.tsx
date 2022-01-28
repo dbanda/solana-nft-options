@@ -1,4 +1,5 @@
-import { ASSOCIATED_TOKEN_PROGRAM_ID, Token, TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { AccountInfo, AccountLayout, ASSOCIATED_TOKEN_PROGRAM_ID, Token, TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { SignerWalletAdapter } from "@solana/wallet-adapter-base";
 import { Connection, PublicKey, SendOptions, Signer, Transaction } from "@solana/web3.js";
 declare const window: any;
 
@@ -16,13 +17,19 @@ export const NETWORK_DEFAULTS: Record<string, any> = {
     'localnet': {inst: "SOL", strike_inst: "USDT_ILT", strike: 140},
 }
 
-export async function isTokenAccountAvailable(conn: Connection, addr: string, owner: Signer) {
+export async function isTokenAccountAvailable(conn: Connection, addr: string, wallet: SignerWalletAdapter) {
     let tok_acc_addr = await Token.getAssociatedTokenAddress(ASSOCIATED_TOKEN_PROGRAM_ID,
-        TOKEN_PROGRAM_ID, new PublicKey(addr), owner.publicKey)
-    let tok = new Token(conn, new PublicKey(addr), TOKEN_PROGRAM_ID, owner);
+        TOKEN_PROGRAM_ID, new PublicKey(addr), wallet.publicKey!)
+
     try {
         // check if account exists
-        let ac = await tok.getAccountInfo(tok_acc_addr);
+        const info = await conn.getAccountInfo(new PublicKey(tok_acc_addr));
+        if (!info!.owner.equals(TOKEN_PROGRAM_ID)) {
+            throw new Error("not owned by token prog");
+        }
+        const data = Buffer.from(info!.data);
+        let ac : AccountInfo = AccountLayout.decode(data);
+
         console.log("tok ac", ac, ac.amount);
         return [tok_acc_addr, ac.amount]
     } catch (err) {
@@ -30,44 +37,33 @@ export async function isTokenAccountAvailable(conn: Connection, addr: string, ow
     }
 }
 
-
-export async function patchConnection(conn: Connection, fee_payer: Signer) {
-    let originalSend = conn.sendTransaction;
-    originalSend.bind(conn)
-    const patchedSend = async (transaction: Transaction,
-        signers: Array<Signer>,
-        options?: SendOptions): Promise<any> => {
-        let { blockhash } = await conn.getRecentBlockhash();
-        transaction.recentBlockhash = blockhash;
-        transaction.feePayer = fee_payer.publicKey;
-        if (signers.length > 1) transaction.partialSign(...signers.slice(1));
-        let signed = await window.solana.signTransaction(transaction);
-        let r = signed.serialize({ verifySignatures: false })
-        return conn.sendRawTransaction(r, options);
-    }
-    conn.sendTransaction = patchedSend
-}
-
-export async function isOwned(conn: Connection, nft_mint: PublicKey, nft_account: PublicKey, owner: Signer) {
-    let nft_tok = new Token(conn, new PublicKey(nft_mint), TOKEN_PROGRAM_ID, owner);
+export async function isOwned(conn: Connection, nft_mint: PublicKey, nft_account: PublicKey, wallet: SignerWalletAdapter) {
     try {
         // check if account exists
-        let ac = await nft_tok.getAccountInfo(nft_account);
+        const info = await conn.getAccountInfo(new PublicKey(nft_mint));
+        if (!info!.owner.equals(TOKEN_PROGRAM_ID)) {
+            throw new Error("not owned by token prog");
+        }
+        const data = Buffer.from(info!.data);
+        let ac : AccountInfo = AccountLayout.decode(data);
+        if (ac.owner != wallet.publicKey){
+            throw new Error("not owned by " + wallet.publicKey)
+        }
         return ac.amount
     }catch(e){
         return -1
     }
 }
 
-export async function transferNFT(conn:Connection, nft_account: PublicKey,  receiver: PublicKey, owner: Signer) {
+export async function transferNFT(conn: Connection, wallet: SignerWalletAdapter,  nft_account: PublicKey,  receiver: PublicKey) {
     console.log("transfering ownership of nft", nft_account.toString(), "to", receiver.toString())
     let sell_ix = Token.createTransferInstruction(TOKEN_PROGRAM_ID, nft_account, 
-        receiver, owner.publicKey, [owner], 1 )
+        receiver, wallet.publicKey!, [], 1 )
 
     var tx = new Transaction();
     tx.add( sell_ix)
     try{
-        let sig_sell = await conn.sendTransaction(tx, [owner], {skipPreflight: false, preflightCommitment: 'finalized'});
+        let sig_sell = await wallet.sendTransaction(tx, conn, {skipPreflight: false, preflightCommitment: 'finalized'});
         console.log("sending", tx)
         return await conn.confirmTransaction(sig_sell, "finalized");
     }catch(e){
@@ -76,53 +72,75 @@ export async function transferNFT(conn:Connection, nft_account: PublicKey,  rece
     
 }
 
-export async function getOrCreateAccounts(conn: Connection, instrument: String, strike_instrument: String, owner: Signer) {
-    let instr_acc_addr = await Token.getAssociatedTokenAddress(ASSOCIATED_TOKEN_PROGRAM_ID,
-        TOKEN_PROGRAM_ID, new PublicKey(instrument), owner.publicKey)
-    let strike_instr_acc_addr = await Token.getAssociatedTokenAddress(ASSOCIATED_TOKEN_PROGRAM_ID,
-        TOKEN_PROGRAM_ID, new PublicKey(strike_instrument), owner.publicKey)
+export async function getOrCreateAccounts(conn: Connection, wallet: SignerWalletAdapter, instrument: String | null, strike_instrument: String | null) {
+    var instr_acc_addr: PublicKey | null = null;
+    var strike_instr_acc_addr: PublicKey | null = null;
 
-    let inst_tok = new Token(conn, new PublicKey(instrument), TOKEN_PROGRAM_ID, owner);
-    let strike_inst_tok = new Token(conn, new PublicKey(strike_instrument), TOKEN_PROGRAM_ID, owner);
-
-
-    try {
-        // check if account exists
-        let ac = await inst_tok.getAccountInfo(instr_acc_addr);
-        console.log("inst ac", ac, ac.amount);
-    } catch (err) {
-        const tx = new Transaction()
-        console.log(err);
-        alert("Instrument account not found. Will attempt to create");
-        let create_ix = Token.createAssociatedTokenAccountInstruction(ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID,
-            new PublicKey(instrument), instr_acc_addr, owner.publicKey, owner.publicKey)
-        let blockhash = await conn.getRecentBlockhash();
-        tx.recentBlockhash = blockhash.blockhash;
-        tx.feePayer = owner.publicKey;
-        tx.add(create_ix)
-        const signature2 = await window.solana.signAndSendTransaction(tx);
-        console.log("sent tx", signature2)
-        await conn.confirmTransaction(signature2.signature);
-        console.log("account created!")
+    if (instrument){
+        instr_acc_addr = await Token.getAssociatedTokenAddress(ASSOCIATED_TOKEN_PROGRAM_ID,
+            TOKEN_PROGRAM_ID, new PublicKey(instrument), wallet.publicKey!)
+        try {
+            // check if account exists
+            const info = await conn.getAccountInfo(new PublicKey(instr_acc_addr));
+            if (!info!.owner.equals(TOKEN_PROGRAM_ID)) {
+                throw new Error("not owned by token prog");
+            }
+            const data = Buffer.from(info!.data);
+            let ac = AccountLayout.decode(data);
+            console.log("inst ac", ac, ac.amount);
+        } catch (err) {
+            const tx = new Transaction()
+            console.error(err);
+            alert("Instrument account not found. Will attempt to create");
+            let create_ix = Token.createAssociatedTokenAccountInstruction(ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID,
+                new PublicKey(instrument as string), instr_acc_addr, wallet.publicKey!, wallet.publicKey!)
+            let blockhash = await conn.getRecentBlockhash();
+            tx.recentBlockhash = blockhash.blockhash;
+            tx.feePayer = wallet.publicKey!;
+            tx.add(create_ix)
+            console.log("sending tx", tx)
+            const signature = await wallet.sendTransaction(tx, conn)
+            console.log("sent tx", signature)
+            await conn.confirmTransaction(signature);
+            console.log("account created!")
+        }
     }
 
-    try {
-        // check if account exists
-        let ac = await strike_inst_tok.getAccountInfo(strike_instr_acc_addr);
-        console.log("strike ac", ac, ac.amount);
-    } catch (err) {
-        alert("Strike instrument account not found. Will attempt to create")
-        const tx = new Transaction()
-        let create_ix = Token.createAssociatedTokenAccountInstruction(ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID,
-            new PublicKey(strike_instrument), strike_instr_acc_addr, owner.publicKey, owner.publicKey)
-        let { blockhash } = await conn.getRecentBlockhash();
-        tx.recentBlockhash = blockhash;
-        tx.feePayer = owner.publicKey;
-        tx.add(create_ix)
-        const { signature } = await window.solana.signAndSendTransaction(tx);
-        await conn.confirmTransaction(signature);
-        console.log("account created!")
-    }
+    if (strike_instrument){
+        strike_instr_acc_addr = await Token.getAssociatedTokenAddress(ASSOCIATED_TOKEN_PROGRAM_ID,
+            TOKEN_PROGRAM_ID, new PublicKey(strike_instrument), wallet.publicKey!)
 
+        try {
+            // check if account exists
+            const info = await conn.getAccountInfo(new PublicKey(strike_instr_acc_addr));
+            if (!info!.owner.equals(TOKEN_PROGRAM_ID)) {
+                throw new Error("not owned by token prog");
+            }
+            const data = Buffer.from(info!.data);
+            let ac = AccountLayout.decode(data);
+            console.log("strike ac", ac, ac.amount);
+        } catch (err) {
+            alert("Strike instrument account not found. Will attempt to create")
+            const tx = new Transaction()
+            let create_ix = Token.createAssociatedTokenAccountInstruction(ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID,
+                new PublicKey(strike_instrument), strike_instr_acc_addr, wallet.publicKey!, wallet.publicKey!)
+            let { blockhash } = await conn.getRecentBlockhash();
+            tx.recentBlockhash = blockhash;
+            tx.feePayer = wallet.publicKey!;
+            tx.add(create_ix)
+            console.log("sending tx", tx)
+            const signature = await wallet.sendTransaction(tx, conn)
+            console.log("sent tx", signature)
+            await conn.confirmTransaction(signature);
+            console.log("account created!")
+        }    
+    }
     return [instr_acc_addr, strike_instr_acc_addr]
+}
+
+export function pprint(str: string){
+    if (str.length > 15){
+        return str.substring(0,5) + "..." + str.substring(str.length-5)
+    }
+    return str
 }

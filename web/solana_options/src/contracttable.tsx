@@ -16,26 +16,47 @@ import Typography from '@mui/material/Typography';
 import Modal from '@mui/material/Modal';
 import { TokenListProvider, TokenInfo } from '@solana/spl-token-registry';
 import dayjs, { OptionType } from 'dayjs';
-import { getOrCreateAccounts, isOwned, isTokenAccountAvailable, NETWORK_TO_URI, patchConnection, transferNFT } from './utils';
+import { getOrCreateAccounts, isOwned, isTokenAccountAvailable, NETWORK_TO_URI, pprint, transferNFT } from './utils';
 import { Connection, PublicKey } from '@solana/web3.js';
 import { Alert, FormControlLabel, FormGroup, Switch } from '@mui/material';
 import { close_option, Contract, exercise_call, exercise_put, get_contract_from_blockchain, print_contract } from 'solana-options';
+import { useWallet, WalletContextState } from '@solana/wallet-adapter-react';
+import { useWalletDialog } from '@solana/wallet-adapter-material-ui';
+import { SignerWalletAdapter } from '@solana/wallet-adapter-base';
+import theme from './theme';
 
 const INTERVAL = 30_000
 declare const window: any;
 
 const style = {
-  position: 'absolute',
-  top: '50%',
-  left: '50%',
-  transform: 'translate(-50%, -50%)',
-  width: 600,
-  bgcolor: 'background.paper',
-  border: '2px solid #000',
-  boxShadow: 24,
-  p: 4,
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    // width: 600,
+    // width: {
+    //   // [theme.breakpoints.down('sm')]: '95%'
+    //   "@media (maxWidth:599.95px)": "95%"
+    // },
+
+    [theme.breakpoints.down('sm')]: {
+      width: '95%'
+    },
+    maxWidth: "100%",
+    bgcolor: 'background.paper',
+    color: "white",
+    border: '2px solid #000',
+    boxShadow: 24,
+    p: 4,
 };
 
+console.log("Style", style)
+
+const grid_style = {
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whitespace: "nowrap"
+}
 enum ContractAction {
   exercise = 0,
   close
@@ -59,11 +80,12 @@ const columns = [
   { id: 'writer_recv_acc', label: 'receive account' },
 ]
 
-export type tableProps = { network?: string, newRows?: any[], nft?: string | null };
+export type tableProps = { network?: string, newRows?: any[], nft?: string | null, wallet_ctx: WalletContextState };
 const ROW_CACHE: any = {}
 
 export default class ContractTable extends React.Component<tableProps>{
   TOKEN_MAP?: Map<string, TokenInfo>
+  wallet_ctx: WalletContextState
   cursor = 0
   fetch_interval?: NodeJS.Timer
   state: any
@@ -72,8 +94,7 @@ export default class ContractTable extends React.Component<tableProps>{
   constructor(props: any) {
     super(props);
     this.network = props.network;
-    let show_closed = window.sessionStorage.getItem("show_closed");
-
+    this.wallet_ctx = props.wallet_ctx
     this.state = {
       page: 0,
       rowsPerPage: 10,
@@ -84,12 +105,18 @@ export default class ContractTable extends React.Component<tableProps>{
       row_busy: false,
       row_show_alert: null,
       row_show_msg: null,
-      show_closed: (show_closed == null)? true: (show_closed==="true"),
+      show_closed: null,
       loading_rows: true,
       receiver: ""
     }
     this.state.rows = [this.getExample()[0]]
     this.cursor = 0
+  }
+
+  getStorageState(){
+    let show_closed = window.sessionStorage.getItem("show_closed");
+    if (show_closed && (show_closed === "true") != this.state.show_closed )
+      this.setState({show_closed: (show_closed == null)? true: (show_closed==="true") });
   }
 
   getExample() {
@@ -117,6 +144,7 @@ export default class ContractTable extends React.Component<tableProps>{
 
   componentDidUpdate(prevProps: any) {
     this.network = this.props.network
+    this.getStorageState();
     console.log("contract table update ", this.network)
     if (this.props.network !== prevProps.network) {
       this.TOKEN_MAP = undefined
@@ -128,10 +156,14 @@ export default class ContractTable extends React.Component<tableProps>{
       this.setState({ network: this.props.network, rows: prevProps.newRows })
       this.getData()
     }
+    if (this.props.wallet_ctx !== prevProps.wallet_ctx){
+      this.wallet_ctx = this.props.wallet_ctx
+    }
   }
 
   componentDidMount() {
     console.log("mounts ", this.network)
+    this.getStorageState();
     this.getData()
     // get data every 3 secs
     this.fetch_interval = setInterval(() => { this.getNewData() }, INTERVAL)
@@ -224,28 +256,30 @@ export default class ContractTable extends React.Component<tableProps>{
                 counter -= 1
                 this.setState({ rows: this.state.rows, loading_rows: (counter <= 0) ? false : true }) // refresh state
               } else {
-                // asynchronously update the live property. 600ms delay
-                setTimeout(()=>{
-                  this.isLiveAccount(rows[i].account_id, conn).then(ac => {
-                    rows[i].show = ac
-                    ROW_CACHE[rows[i].account_id] = rows[i]
-                    console.log("isliveaccount", rows[i], ac)
+                let r = rows[i]
+                const check_live = (r: any, i: number) =>{
+                  return ()=>{
                     counter -= 1
-                    this.setState({ rows: this.state.rows, loading_rows: (counter <= 0) ? false : true }) // refresh state
-                  })
-                }, i*600)
+                    this.isLiveAccount(r.account_id, conn).then(ac => {
+                      r.show = ac
+                      ROW_CACHE[r.account_id] = r
+                      console.log("isliveaccount", r, ac)
+                      counter -= 1
+                      this.setState({ rows: this.state.rows, loading_rows: (counter <= 0) ? false : true }) // refresh state
+                    })
+                  }
+                }
+                // asynchronously update the live property. 600ms delay
+                setTimeout(check_live(r,i), i*600)
               }
             }
           }
           return rows
         }
-
+        
+        console.log("filtering", rows)
         filter(rows).then((data) => {
           var rows = data
-          // if (!this.state.show_closed) {
-          //   rows = data.filter((r) => r.show);
-          // }
-
           console.log("filterd rows", rows)
           console.log("show closed", this.state.show_closed)
           console.log("rows", this.state.rows.length - 1)
@@ -266,10 +300,10 @@ export default class ContractTable extends React.Component<tableProps>{
               row.instrument_key = row.instrument
               row.writer_recv_acc_key = row.writer_recv_acc
 
-              row.strike_instrument = <a href={'https://explorer.solana.com/address/' + row.strike_instrument + "?cluster=" + uri}>{row.strike_instrument}</a>
-              row.instrument = <a href={'https://explorer.solana.com/address/' + row.instrument + "?cluster=" + uri}>{row.instrument}</a>
-              row.nft_id = <a href={'https://explorer.solana.com/address/' + row.nft_id + "?cluster=" + uri}>{row.nft_id}</a>
-              row.writer_recv_acc = <a href={'https://explorer.solana.com/address/' + row.writer_recv_acc + "?cluster=" + uri}>{row.writer_recv_acc}</a>
+              row.strike_instrument = <a href={'https://explorer.solana.com/address/' + row.strike_instrument + "?cluster=" + uri}>{pprint(row.strike_instrument)}</a>
+              row.instrument = <a href={'https://explorer.solana.com/address/' + row.instrument + "?cluster=" + uri}>{pprint(row.instrument)}</a>
+              row.nft_id = <a href={'https://explorer.solana.com/address/' + row.nft_id + "?cluster=" + uri}>{pprint(row.nft_id)}</a>
+              row.writer_recv_acc = <a href={'https://explorer.solana.com/address/' + row.writer_recv_acc + "?cluster=" + uri}>{pprint(row.writer_recv_acc)}</a>
               return row
             })
 
@@ -304,7 +338,7 @@ export default class ContractTable extends React.Component<tableProps>{
     window.open("https://phantom.app/", "_blank");
   };
 
-  async exerciseOrClose(row: any, action: ContractAction) {
+  async exerciseOrClose(row: any, action: ContractAction, wallet: SignerWalletAdapter) {
     let uri = NETWORK_TO_URI[(this.state.network as string).toLowerCase()]
     console.log("connecting to", this.state.network, uri)
     let conn = new Connection(uri);
@@ -321,13 +355,12 @@ export default class ContractTable extends React.Component<tableProps>{
       return this.setState({ row_show_alert: this.isNotExpired(row), row_busy: false })
     }
 
-    await patchConnection(conn, this.state.user)
-    let [nft_tok_acc, amnt] = await isTokenAccountAvailable(conn, row.nft_id_key, this.state.user)
+    let [nft_tok_acc, amnt] = await isTokenAccountAvailable(conn, row.nft_id_key, wallet)
     if (!nft_tok_acc) {
-      this.setState({ row_show_alert: "An account for this NFT couldn't be found. Check that you own the nft for this contract" })
+      this.setState({ row_show_alert: "An account for this NFT couldn't be found. Check that you own the nft for this contract", row_busy: false  })
     }
     else if (amnt! < 1) {
-      this.setState({ row_show_alert: "Failed to verify ownership of the NFT for this contract. Please check your wallet." })
+      this.setState({ row_show_alert: "Failed to verify ownership of the NFT for this contract. Please check your wallet.", row_busy: false  })
     } else {
       let contract: Contract = {
         strike: row.strike,
@@ -344,10 +377,10 @@ export default class ContractTable extends React.Component<tableProps>{
         kind: row.kind
       }
 
-      var inst_acc: PublicKey
-      var strike_inst_acc: PublicKey
+      var inst_acc: PublicKey | null
+      var strike_inst_acc: PublicKey | null
       try {
-        [inst_acc, strike_inst_acc] = await getOrCreateAccounts(conn, contract.instrument.toString(), contract.strike_instrument.toString(), this.state.user)
+        [inst_acc, strike_inst_acc] = await getOrCreateAccounts(conn, wallet, contract.instrument.toString(), contract.strike_instrument.toString())
       } catch (e) {
         console.error("could not get or create", contract.instrument.toString(), contract.strike_instrument.toString())
         this.setState({
@@ -362,17 +395,17 @@ export default class ContractTable extends React.Component<tableProps>{
         try {
           this.setState({ row_show_msg: "Exercising option contract on blockchain... This may take a while." })
           if (contract.kind as OptionType === Kind.call) {
-            let sig = await exercise_call(conn, contract, this.state.user, nft_tok_acc as PublicKey, inst_acc, strike_inst_acc)
+            let sig = await exercise_call(conn, contract, wallet, nft_tok_acc as PublicKey, inst_acc!, strike_inst_acc!)
             await conn.confirmTransaction(sig as string, "finalized")
           } else {
-            let sig = await exercise_put(conn, contract, this.state.user, nft_tok_acc as PublicKey, strike_inst_acc, inst_acc)
+            let sig = await exercise_put(conn, contract, wallet, nft_tok_acc as PublicKey, strike_inst_acc!, inst_acc!)
             await conn.confirmTransaction(sig as string, "finalized")
           }
 
         } catch (e: any) {
-          var msg = util.format("Error exercising contract: %s %s", e.message, e.logs)
+          var msg = util.format("Error exercising contract: %s %s", e.message, e.error.logs)
 
-          if (e.logs && msg.indexOf("insufficient funds")>-1){
+          if (e.error.logs && msg.indexOf("insufficient funds")>-1){
             msg = "insufficient funds in accounts"
           }
           this.setState({ row_show_alert: msg, row_busy: false })
@@ -382,15 +415,14 @@ export default class ContractTable extends React.Component<tableProps>{
 
       } else {
         console.log("closing", print_contract(contract))
-        // let [inst_acc, strike_inst_acc] = await getOrCreateAccounts(conn, contract.instrument.toString(), contract.strike_instrument.toString(), this.state.user)
         try {
           this.setState({ row_show_msg: "Closing option contract on blockchain... This may take a while." })
           if (contract.kind as OptionType === Kind.call) {
 
-            let sig = await close_option(conn, contract, this.state.user, inst_acc)
+            let sig = await close_option(conn, contract, wallet, inst_acc!)
             await conn.confirmTransaction(sig as string, "finalized")
           } else {
-            let sig = await close_option(conn, contract, this.state.user, strike_inst_acc)
+            let sig = await close_option(conn, contract, wallet, strike_inst_acc!)
             await conn.confirmTransaction(sig as string, "finalized")
           }
         } catch (e) {
@@ -409,15 +441,18 @@ export default class ContractTable extends React.Component<tableProps>{
   }
 
   async login() {
-    let phantom = this.getProvider()
-    let resp = await phantom.connect()
-    return resp
+    if (this.wallet_ctx.wallet){
+      if (!this.wallet_ctx.connected) await this.wallet_ctx.connect();
+      return this.wallet_ctx
+    } else{
+      alert("First connect your wallet!")
+      throw Error("wallet not connected")
+    }
   }
 
-  async sendNFT(conn: Connection, nft_account: PublicKey, receiver: PublicKey) {
-    await patchConnection(conn, this.state.user)
+  async sendNFT(conn: Connection, wallet: SignerWalletAdapter, nft_account: PublicKey, receiver: PublicKey) {
     this.setState({ row_show_alert: null, row_show_msg: "Sending ..." });
-    return transferNFT(conn, nft_account, receiver, this.state.user)
+    return transferNFT(conn, wallet, nft_account, receiver)
   }
 
   send_evt(e: any, row: any) {
@@ -437,32 +472,26 @@ export default class ContractTable extends React.Component<tableProps>{
 
 
     let nft_account = new PublicKey(row.nft_account)
-    this.login().then((resp: { publicKey: { toString: () => any; }; }) => {
-      console.log("pubkey", resp, resp.publicKey.toString())
-      this.setState({ user: resp })
-      this.sendNFT(conn, nft_account, receiver).then((s) => {
+    this.login().then((wallet_ctx : WalletContextState) => {
+      this.sendNFT(conn, wallet_ctx.wallet?.adapter as SignerWalletAdapter , nft_account, receiver).then((s) => {
         console.log("confirmation", s)
         this.setState({ row_busy: false, row_show_alert: null, row_show_msg: "Done!" });
       }).catch(e => {
         this.setState({ row_busy: false, row_show_msg: null, row_show_alert: "Error sending NFT: " + JSON.stringify(e) })
       })
     }).catch(e => {
-      this.setState({ row_busy: false, row_show_msg: null, row_show_alert: "Phantom wallet login failed: " + JSON.stringify(e) })
+      this.setState({ row_busy: false, row_show_msg: null, row_show_alert: "Wallet login failed: " + JSON.stringify(e) })
     })
-
-
   }
 
-  async checkOwnership(conn: Connection, row: any) {
-    let owned = await isOwned(conn, new PublicKey(row.nft_id_key), new PublicKey(row.nft_account), this.state.user)
+  async checkOwnership(conn: Connection, row: any, wallet: SignerWalletAdapter) {
+    let owned = await isOwned(conn, new PublicKey(row.nft_id_key), new PublicKey(row.nft_account), wallet)
     console.log("owned", owned, owned < 0)
     if (owned < 0) {
       return this.setState({ row_show_alert: "Did not find an account holding this NFT in your wallet", row_busy: false })
     } else if (owned === 0) {
       return this.setState({ row_show_alert: "You already sent this NFT", row_busy: false })
     }
-
-
     this.setState({ row_busy: false, open_transfer: true, open_row: false })
   }
 
@@ -475,13 +504,15 @@ export default class ContractTable extends React.Component<tableProps>{
     let conn = new Connection(uri);
 
     console.log("transfering ownership to bob")
-    this.checkOwnership(conn, row).then(() => {
-      console.log("ownership confirmed for", this.state.user)
+    this.login().then((wallet_ctx: WalletContextState)=>{
+      this.checkOwnership(conn, row, wallet_ctx.wallet?.adapter as SignerWalletAdapter).then(() => {
+        console.log("ownership confirmed for", this.wallet_ctx.publicKey)
+      }).catch(e => {
+        this.setState({ row_busy: false, row_show_alert: "Error " + e })
+      })
     }).catch(e => {
-      this.setState({ row_busy: false, row_show_alert: "Error " + e })
+      this.setState({ row_busy: false, row_show_msg: null, row_show_alert: "Wallet login failed: " + JSON.stringify(e) })
     })
-
-
   }
 
   contract_action_evt(e: any, row: any, action: ContractAction) {
@@ -490,13 +521,13 @@ export default class ContractTable extends React.Component<tableProps>{
 
     this.setState({ row_busy: true, row_show_msg: null, row_show_alert: null })
 
-    this.login().then((resp: { publicKey: { toString: () => any; }; }) => {
-      console.log("pubkey", resp, resp.publicKey.toString())
-      this.setState({ user: resp })
-      this.exerciseOrClose(row, action)
+    this.login().then((wallet_ctx: WalletContextState) => {
+      this.exerciseOrClose(row, action, wallet_ctx.wallet?.adapter as SignerWalletAdapter)
       // this.create().then(done=>console.log("done"))
+    }).catch(e => {
+      console.error("login err", e)
+      this.setState({ row_busy: false, row_show_msg: null, row_show_alert: "Connect to wallet first: " + JSON.stringify(e) })
     })
-
   }
 
   getRowOnClick(row: any) {
@@ -516,7 +547,7 @@ export default class ContractTable extends React.Component<tableProps>{
             checked={this.state.show_closed}
             onChange={(e, checked) => {
                 console.log("changing checked", checked)
-                window.sessionStorage.setItem("show_closed", checked);
+                if (window) window.sessionStorage.setItem("show_closed", checked);
                 this.setState({ show_closed: checked, rows: [] })
                 this.getData()
               }
@@ -524,7 +555,7 @@ export default class ContractTable extends React.Component<tableProps>{
           />} label="Show closed" />
         </FormGroup>
 
-        <TableContainer sx={{ maxHeight: 440, align: "center", margin: "10px", fontSize: 12 } as any}>
+        <TableContainer sx={{ maxHeight: 440, align: "center", margin: "10px", fontSize: 15 } as any}>
           {this.state.loading_rows && <LinearProgress></LinearProgress>}
           <Table stickyHeader aria-label="sticky table">
             <TableHead>
@@ -533,7 +564,7 @@ export default class ContractTable extends React.Component<tableProps>{
                   <TableCell
                     key={column.id}
                     align={column.align}
-                    style={{ minWidth: column.minWidth, fontSize: 12, maxWidth: column.maxWidth || "100%" }}
+                    style={{ minWidth: column.minWidth, fontSize: 15, maxWidth: column.maxWidth || "100%" }}
                   >
                     {column.label}
                   </TableCell>
@@ -546,11 +577,11 @@ export default class ContractTable extends React.Component<tableProps>{
                 .filter((r: any) => this.state.show_closed || r.show)
                 .map((row: { [x: string]: any; }, ir: string) => {
                   return (
-                    <TableRow sx={{ cursor: "pointer" }} hover role="checkbox" tabIndex={-1} key={"" + ir} onClick={this.getRowOnClick(row)}>
+                    <TableRow sx={{ cursor: "pointer"}} hover role="checkbox" tabIndex={-1} key={"" + ir} onClick={this.getRowOnClick(row)}>
                       {columns.map((column: any, ic) => {
                         const value = row[column.id];
                         return (
-                          <TableCell key={"" + ir + "-" + ic} align={column.align} sx={{ fontSize: 10, m: 1, p: 1 }}>
+                          <TableCell key={"" + ir + "-" + ic} align={column.align} sx={{ fontSize: 15, m: 1, pt: 3, pb: 3 }}>
                             {column.format && typeof value === 'number'
                               ? column.format(value)
                               : value}
@@ -583,8 +614,6 @@ export default class ContractTable extends React.Component<tableProps>{
             <Typography id="modal-modal-title" variant="h6" component="h2">
               Contract
             </Typography>
-            {/* <br></br> */}
-            {/* Network: {this.state.network} */}
             <br></br>
             {
               this.state.row_show_msg && !this.state.row_show_alert && (
@@ -601,55 +630,55 @@ export default class ContractTable extends React.Component<tableProps>{
                 </Alert>
               )
             }
-            <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }}>
-              <Grid item xs={2}>
+            <Grid container rowSpacing={1} columnSpacing={{ xs: 2, sm: 2, md: 3 }}>
+              <Grid item xs={4}>
                 strike:
               </Grid>
-              <Grid item xs={10}>
+              <Grid item xs={8}>
                 {this.state.row.strike}
               </Grid>
-              <Grid item xs={2}>
+              <Grid item xs={4}>
                 expiry:
               </Grid>
-              <Grid item xs={10}>
+              <Grid item xs={8}>
                 {dayjs(this.state.row.expiry * 1000).format("DD/MM/YY HH:mm:ss")} &emsp; {dayjs(this.state.row.expiry * 1000).format("Z")}
               </Grid>
-              <Grid item xs={2}>
+              <Grid item xs={4}>
                 multiple:
               </Grid>
-              <Grid item xs={10}>
+              <Grid item xs={8}>
                 {this.state.row.multiple}
               </Grid>
-              <Grid item xs={2}>
+              <Grid item xs={4}>
                 created on:
               </Grid>
-              <Grid item xs={10}>
+              <Grid item xs={8}>
                 {dayjs(this.state.row.timestamp).format("DD/MM/YY HH:mm:ss")} &emsp; {dayjs(this.state.row.timestamp).format("Z")}
               </Grid>
 
 
-              <Grid item xs={3}>
+              <Grid item xs={4} >
                 nft_id:
               </Grid>
-              <Grid item xs={9}>
+              <Grid item xs={8} sx={grid_style as any}>
                 {this.state.row.nft_id}
               </Grid>
-              <Grid item xs={3}>
+              <Grid item xs={4} >
                 instrument:
               </Grid>
-              <Grid item xs={9}>
+              <Grid item xs={8} sx={grid_style as any}>
                 {this.state.row.instrument} {this.state.row.instrument_symbol}
               </Grid>
-              <Grid item xs={3}>
+              <Grid item xs={4}>
                 strike instrument:
               </Grid>
-              <Grid item xs={9}>
+              <Grid item xs={8} sx={grid_style as any}>
                 {this.state.row.strike_instrument} {this.state.row.strike_instrument_symbol}
               </Grid>
-              <Grid item xs={3}>
+              <Grid item xs={4} >
                 receiving account:
               </Grid>
-              <Grid item xs={9}>
+              <Grid item xs={8} sx={grid_style as any}>
                 {this.state.row.writer_recv_acc}
               </Grid>
             </Grid>
