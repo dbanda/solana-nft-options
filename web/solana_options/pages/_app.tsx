@@ -8,11 +8,12 @@ import '../src/index.css'
 import theme from '../src/theme';
 import Script from 'next/script';
 import { ThemeProvider } from '@emotion/react';
+import CssBaseline from '@mui/material/CssBaseline';
 
 // Use require instead of import since order matters
 // require('antd/dist/antd.dark.less');
-// require('@solana/wallet-adapter-ant-design/styles.css');
-// require('@solana/wallet-adapter-react-ui/styles.css');
+require('@solana/wallet-adapter-ant-design/styles.css');
+require('@solana/wallet-adapter-react-ui/styles.css');
 // require('../styles/globals.css');
 
 const App: FC<AppProps> = ({ Component, pageProps }) => {
@@ -46,6 +47,7 @@ const App: FC<AppProps> = ({ Component, pageProps }) => {
 
             </Head>
             <ThemeProvider theme={theme}>
+              <CssBaseline/>
               <ContextProvider>
                   <Component {...pageProps} />
               </ContextProvider>
