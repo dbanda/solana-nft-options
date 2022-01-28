@@ -10,7 +10,7 @@ export { get_contract_from_blockchain, verify_contract, print_contract };
 import { publish_doc, create_doc_img } from "./doc";
 export { publish_doc, create_doc_img };
 import { TokenListProvider, TokenInfo } from '@solana/spl-token-registry';
-import { WalletAdapter } from "@solana/wallet-adapter-base";
+import { SignerWalletAdapter } from "@solana/wallet-adapter-base";
 
 const OPTIONS_PROGRAM_ID = process.env.OPTIONS_PROGRAM_ID || process.env.REACT_APP_OPTIONS_PROGRAM_ID || "DV4NugS55eXXposgxLnLr7WxySCTpaDd3cQPegFenHaj"
 const SEED = "optionsnft";
@@ -72,7 +72,7 @@ async function get_token_map(): Promise<Map<string, string>> {
  * @param creator_strike_instrument_acc 
  * @returns 
  */
-export async function create_call(connection: Connection, strike: number, expiry: number, multiple: number, creator_account: Signer | WalletAdapter,
+export async function create_call(connection: Connection, strike: number, expiry: number, multiple: number, creator_account: Signer | SignerWalletAdapter,
   instrument: PublicKey | string | null, strike_instrument: PublicKey | string | null, creator_instrument_acc: PublicKey | null,
   creator_strike_instrument_acc: PublicKey | null): Promise<[string, Contract]> {
   console.log("creating call contract")
@@ -95,7 +95,7 @@ export async function create_call(connection: Connection, strike: number, expiry
  * @param creator_strike_instrument_acc 
  * @returns 
  */
-export async function create_put(connection: Connection, strike: number, expiry: number, multiple: number, creator_account: Signer | WalletAdapter,
+export async function create_put(connection: Connection, strike: number, expiry: number, multiple: number, creator_account: Signer | SignerWalletAdapter,
   instrument: PublicKey | string | null, strike_instrument: PublicKey | string | null, creator_instrument_acc: PublicKey | null,
   creator_strike_instrument_acc: PublicKey | null): Promise<[string, Contract]> {
   console.log("creating put contract")
@@ -104,7 +104,7 @@ export async function create_put(connection: Connection, strike: number, expiry:
     strike_instrument, creator_instrument_acc, creator_strike_instrument_acc, OptionType.put)
 }
 
-export async function create_new_nft_mint(connection: Connection, multiple: number, creator_account: Signer | WalletAdapter) {
+export async function create_new_nft_mint(connection: Connection, multiple: number, creator_account: Signer | SignerWalletAdapter) {
   const instrument_mint_acc = new Keypair();
   console.log("instrument mint account key: ", instrument_mint_acc.publicKey.toString())
   const mint_rent = await connection.getMinimumBalanceForRentExemption(MintLayout.span, 'confirmed')
@@ -178,9 +178,8 @@ export async function create_new_nft_mint(connection: Connection, multiple: numb
 
   if (!("secretKey" in creator_account)) {
     // this must be a wallet type then
-    let wallet = creator_account as WalletAdapter
-    tx.partialSign(instrument_mint_acc)
-    let sig = await wallet.sendTransaction(tx, connection)
+    let wallet = creator_account as SignerWalletAdapter
+    let sig = await wallet.sendTransaction(tx, connection, {signers: [instrument_mint_acc]})
     return [sig, instrument_mint_acc, creator_instrument_acc]
   }
 
@@ -188,7 +187,7 @@ export async function create_new_nft_mint(connection: Connection, multiple: numb
   return [sig, instrument_mint_acc, creator_instrument_acc]
 }
 
-export async function create_option(connection: Connection, strike: number, expiry: number, multiple: number, creator_account: Signer | WalletAdapter,
+export async function create_option(connection: Connection, strike: number, expiry: number, multiple: number, creator_account: Signer | SignerWalletAdapter,
   instrument: PublicKey | string | null, strike_instrument: PublicKey | string | null, creator_instrument_acc: PublicKey | null, creator_strike_instrument_acc: PublicKey, kind: OptionType): Promise<[string, Contract]> {
 
   // check if the either instrument or strike_instrument is a symbol or address(public); assume symbol if string
@@ -353,9 +352,8 @@ export async function create_option(connection: Connection, strike: number, expi
 
   if (!("secretKey" in creator_account)) {
     // this must be a wallet type then
-    let wallet = creator_account as WalletAdapter
-    tx.partialSign(collateralAccount, optionsAccount, nftTokenAccount)
-    let sig = await wallet.sendTransaction(tx, connection)
+    let wallet = creator_account as SignerWalletAdapter
+    let sig = await wallet.sendTransaction(tx, connection, {signers: [collateralAccount, optionsAccount, nftTokenAccount]})
     console.log("done")
     return [sig, contract]
   }
@@ -366,13 +364,13 @@ export async function create_option(connection: Connection, strike: number, expi
 
 }
 
-export async function exercise_call(connection: Connection, contract: Contract, buyer_acc: Signer | WalletAdapter, buyer_nft_acc: PublicKey,
+export async function exercise_call(connection: Connection, contract: Contract, buyer_acc: Signer | SignerWalletAdapter, buyer_nft_acc: PublicKey,
   buyer_receive_acc: PublicKey, buyer_send_acc: PublicKey) {
   return exercise_option(connection, contract, buyer_acc, buyer_nft_acc,
     buyer_receive_acc, buyer_send_acc, OptionType.call)
 }
 
-export async function exercise_put(connection: Connection, contract: Contract, buyer_acc: Signer | WalletAdapter, buyer_nft_acc: PublicKey,
+export async function exercise_put(connection: Connection, contract: Contract, buyer_acc: Signer | SignerWalletAdapter, buyer_nft_acc: PublicKey,
   buyer_receive_acc: PublicKey, buyer_send_acc: PublicKey) {
   return exercise_option(connection, contract, buyer_acc, buyer_nft_acc,
     buyer_receive_acc, buyer_send_acc, OptionType.put)
@@ -389,7 +387,7 @@ export async function exercise_put(connection: Connection, contract: Contract, b
  * @param kind call or put
  * @returns signature
  */
-export async function exercise_option(connection: Connection, contract: Contract, buyer_acc: Signer | WalletAdapter, buyer_nft_acc: PublicKey,
+export async function exercise_option(connection: Connection, contract: Contract, buyer_acc: Signer | SignerWalletAdapter, buyer_nft_acc: PublicKey,
   buyer_receive_acc: PublicKey, buyer_send_acc: PublicKey, kind: OptionType): Promise<string> {
 
   let strike = contract.strike;
@@ -475,11 +473,11 @@ export async function exercise_option(connection: Connection, contract: Contract
 
   if (!("secretKey" in buyer_acc)) {
     // this must be a wallet type then
-    let wallet = buyer_acc as WalletAdapter
+    let wallet = buyer_acc as SignerWalletAdapter
     return wallet.sendTransaction(tx, connection)
   }
 
-  return connection.sendTransaction(tx, [buyer_acc as Signer], { skipPreflight: false, preflightCommitment: 'confirmed' });
+  return connection.sendTransaction(tx, [buyer_acc], { skipPreflight: false, preflightCommitment: 'confirmed' });
 }
 
 /**
@@ -492,7 +490,7 @@ export async function exercise_option(connection: Connection, contract: Contract
  * @param creator_receive_acc the receiving account where the released collateral will be sent back
  * @returns signature 
  */
-export async function close_option(connection: Connection, contract: Contract, creator_acc: Signer | WalletAdapter, creator_receive_acc: PublicKey): Promise<string> {
+export async function close_option(connection: Connection, contract: Contract, creator_acc: Signer | SignerWalletAdapter, creator_receive_acc: PublicKey): Promise<string> {
 
   const optionsProgramId = new PublicKey(OPTIONS_PROGRAM_ID);
 
@@ -538,7 +536,7 @@ export async function close_option(connection: Connection, contract: Contract, c
 
   if (!("secretKey" in creator_acc)) {
     // this must be a wallet type then
-    let wallet = creator_acc as WalletAdapter
+    let wallet = creator_acc as SignerWalletAdapter
     return wallet.sendTransaction(tx, connection)
   }
   return connection.sendTransaction(tx, [creator_acc], { skipPreflight: false, preflightCommitment: 'confirmed' });

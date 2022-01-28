@@ -45,6 +45,7 @@
     "dayjs": "^1.10.7",
     "jimp": "^0.16.1",
     "qrcode": "^1.5.0",
-    "qrcode-with-logos": "^1.0.3"
+    "qrcode-with-logos": "^1.0.3",
+    "@solana/wallet-adapter-base": "^0.9.1"
   }
 }
