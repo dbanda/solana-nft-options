@@ -105,7 +105,7 @@ export default class ContractTable extends React.Component<tableProps>{
       row_busy: false,
       row_show_alert: null,
       row_show_msg: null,
-      show_closed: null,
+      show_closed: true,
       loading_rows: true,
       receiver: ""
     }
