@@ -185,7 +185,7 @@ export default class CreateOption extends React.Component<createProps>{
                             self.setState({ show_msg: "Confirmed!" });
 
                         } catch (e) {
-                            self.setState({ show_alert: util.format("Error confirming transaction: %s", e), progress: false })
+                            self.setState({ show_alert: util.format("Error confirming transaction: %s", JSON.stringify(e)), progress: false })
                         }
 
                         try {
@@ -215,12 +215,12 @@ export default class CreateOption extends React.Component<createProps>{
                             // window.location.reload(false);
                         } catch (e) {
                             self.props.handleNewContract(contract as Contract)
-                            self.setState({ show_alert: util.format("Error publishing or creating doc %s", e), progress: false, show_msg: null })
+                            self.setState({ show_alert: util.format("Error publishing or creating doc %s", JSON.stringify(e)), progress: false, show_msg: null })
                         }
                     }
                 ).catch((e) => {
                     console.error("create error", e )
-                    this.setState({ show_alert: util.format("Transaction error: %s",e), progress: false })
+                    this.setState({ show_alert: util.format("Transaction error: %s", JSON.stringify(e)), progress: false })
                 })
             }).catch((e) => {
                 console.error("login err",e)
